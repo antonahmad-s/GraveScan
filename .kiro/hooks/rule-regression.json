@@ -5,6 +5,7 @@
       "name": "Rule regression on scanner/simulator/fixtures change",
       "trigger": "PostFileSave",
       "matcher": "packages/(scanner|simulator|fixtures)/",
+      "timeout": 120,
       "action": { "type": "command", "command": "pnpm vitest run packages/scanner packages/simulator packages/fixtures" }
     }
   ]

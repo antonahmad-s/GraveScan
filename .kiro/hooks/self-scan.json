@@ -3,8 +3,10 @@
   "hooks": [
     {
       "name": "Self-scan Kiro configuration",
+      "description": "Disabled until Spec 02 adds `gravescan scan`. Set enabled to true then.",
       "trigger": "PostFileSave",
-      "matcher": "^\\.kiro/(settings|agents|hooks|steering)/",
+      "matcher": "\\.kiro/(settings|agents|hooks|steering)/",
+      "enabled": false,
       "action": { "type": "command", "command": "pnpm gravescan scan --target .kiro --format json" }
     }
   ]
