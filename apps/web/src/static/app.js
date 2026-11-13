@@ -41,9 +41,21 @@ function selectedFinding() {
   return state.report?.findings.find((finding) => finding.id === state.selected) || state.lastFinding || null;
 }
 function severityClass(severity) { return severity === "critical" || severity === "high" ? severity : "medium"; }
+// Lists are rebuilt with innerHTML, so keep keyboard focus on the same item instead of dropping it to <body>.
+function focusedKey(container, attribute) {
+  const active = document.activeElement;
+  return active && container.contains(active) ? active.getAttribute(attribute) : null;
+}
+function restoreFocus(container, attribute, key) {
+  if (key === null) return;
+  const target = [...container.querySelectorAll(`[${attribute}]`)].find((element) => element.getAttribute(attribute) === key);
+  if (target) target.focus();
+}
 function renderFixtures(fixtures) {
+  const focused = focusedKey(fixtureList, "data-fixture");
   fixtureList.innerHTML = fixtures.map((fixture) => `<button class="fixture-button" type="button" data-fixture="${escapeHtml(fixture)}" aria-pressed="${fixture === state.fixture}"><strong>${escapeHtml(fixtureNames[fixture] || fixture)}</strong><span>${escapeHtml(fixture)}</span></button>`).join("");
   fixtureList.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => chooseFixture(button.dataset.fixture)));
+  restoreFocus(fixtureList, "data-fixture", focused);
 }
 function renderControls() {
   const enabled = state.fixture !== null && !state.busy;
@@ -64,6 +76,7 @@ function renderRules() {
   ruleFilter.value = rules.includes(current) ? current : "all";
 }
 function renderFindings() {
+  const focused = focusedKey(findingList, "data-finding");
   findingList.innerHTML = "";
   if (!state.report) { findingState.hidden = false; findingState.textContent = "Select a fixture, then run a scan."; return; }
   const findings = filteredFindings();
@@ -71,9 +84,18 @@ function renderFindings() {
   findingState.hidden = true;
   findingList.innerHTML = findings.map((finding) => `<li><button class="finding-button" type="button" data-finding="${escapeHtml(finding.id)}" aria-current="${finding.id === state.selected}"><span class="severity ${severityClass(finding.severity)}">${escapeHtml(finding.severity)}</span><span><strong>${escapeHtml(finding.ruleId)}: ${escapeHtml(finding.title)}</strong><span class="finding-meta"><span>${escapeHtml(finding.file)}:${finding.line}</span><span>${finding.attackScenarioId ? "Replay available" : "Static evidence"}</span></span></span></button></li>`).join("");
   findingList.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { state.selected = button.dataset.finding; state.lastFinding = selectedFinding(); state.replay = null; state.patch = null; state.verification = null; renderFindings(); renderDetail(); }));
+  restoreFocus(findingList, "data-finding", focused);
 }
 function diffMarkup(diff) {
   return escapeHtml(diff).split("\n").map((line) => `<span class="${line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : line.startsWith("@") ? "header" : ""}">${line}</span>`).join("\n");
+}
+function comparisonList(label, findings) {
+  const items = findings.length === 0 ? "<li>None</li>" : findings.map((finding) => `<li>${escapeHtml(finding.ruleId)}: ${escapeHtml(finding.title)}</li>`).join("");
+  return `<div class="comparison-group"><h4>${label} (${findings.length})</h4><ul>${items}</ul></div>`;
+}
+function comparisonMarkup(comparison) {
+  if (!comparison) return "";
+  return `<div class="comparison" aria-label="Findings compared with the first scan">${comparisonList("Resolved since first scan", comparison.resolved)}${comparisonList("Introduced since first scan", comparison.introduced)}</div>`;
 }
 function renderDetail() {
   const finding = selectedFinding();
@@ -88,7 +110,7 @@ function renderDetail() {
     <section class="detail-section"><h3>Recommended boundary</h3><p>${escapeHtml(finding.remediation)}</p><div class="detail-actions">${finding.attackScenarioId ? '<button id="replay-button" class="quiet-button" type="button">Run safe replay</button>' : ""}<button id="patch-button" class="primary-button" type="button">Generate patch</button></div></section>
     ${replay ? `<section class="detail-section"><h3>${escapeHtml(replay.scenarioName)}</h3><p class="muted">Capability request: ${escapeHtml(replay.capabilityRequest)}. Policy decision: ${escapeHtml(replay.policyDecision)}. Result: ${escapeHtml(replay.result)}.</p><ol class="trace">${replay.steps.map((step) => `<li><strong>${escapeHtml(step.label)}</strong><span>${escapeHtml(step.detail)}</span></li>`).join("")}</ol><p class="boundary-note">${escapeHtml(replay.safetyNotice)}</p></section>` : ""}
     ${patch ? `<section class="detail-section"><h3>Proposed patch</h3><p>${escapeHtml(patch.reason)}</p><p class="muted">Review note: ${escapeHtml(patch.riskNote)}</p><pre class="evidence diff"><code>${diffMarkup(patch.diff)}</code></pre><div class="detail-actions"><button id="apply-button" class="primary-button" type="button">Apply to isolated copy</button></div></section>` : ""}
-    ${verification ? `<section class="detail-section"><span class="verification-status ${verification.status === "Simulation blocked" || verification.status === "Verified" ? "success" : "review"}">${escapeHtml(verification.status)}</span><h3>Verification report</h3><p>Target finding present after patch: ${verification.targetFindingPresent ? "Yes" : "No"}. High/Critical findings: ${verification.highCriticalBefore} before, ${verification.highCriticalAfter} after.</p>${verification.replay ? `<p>Replay result after patch: ${escapeHtml(verification.replay.result)}.</p>` : ""}</section>` : ""}`;
+    ${verification ? `<section class="detail-section"><span class="verification-status ${verification.status === "Simulation blocked" || verification.status === "Verified" ? "success" : "review"}">${escapeHtml(verification.status)}</span><h3>Verification report</h3><p>Target finding present after patch: ${verification.targetFindingPresent ? "Yes" : "No"}. High/Critical findings: ${verification.highCriticalBefore} before, ${verification.highCriticalAfter} after.</p>${verification.replay ? `<p>Replay result after patch: ${escapeHtml(verification.replay.result)}.</p>` : ""}${comparisonMarkup(verification.comparison)}</section>` : ""}`;
   $("#replay-button")?.addEventListener("click", runReplay);
   $("#patch-button")?.addEventListener("click", generatePatch);
   $("#apply-button")?.addEventListener("click", applyPatch);
@@ -117,18 +139,20 @@ async function generatePatch() {
 }
 async function applyPatch() {
   if (!state.patch || !state.fixture) return;
-  try { setBusy(true, "Applying the patch to the isolated copy and verifying it."); const value = await request("/api/patch/apply", { fixture: state.fixture, patchId: state.patch.id }); state.report = value.report; state.verification = value.verification; state.replay = value.verification.replay || null; renderRules(); setStatus(`Verification complete: ${value.verification.status}.`, value.verification.status === "Needs review" || value.verification.status === "Regression detected" ? "error" : "success"); }
+  try { setBusy(true, "Applying the patch to the isolated copy and verifying it."); const value = await request("/api/patch/apply", { fixture: state.fixture, patchId: state.patch.id }); state.report = value.report; state.verification = { ...value.verification, comparison: value.comparison }; state.replay = value.verification.replay || null; renderRules(); setStatus(`Verification complete: ${value.verification.status}.`, value.verification.status === "Needs review" || value.verification.status === "Regression detected" ? "error" : "success"); }
   catch (error) { setStatus(error.message, "error"); }
   finally { setBusy(false); renderFindings(); renderDetail(); }
 }
-function exportMarkdown() {
+async function exportMarkdown() {
   if (!state.report || !state.fixture) return;
-  const lines = [`# GraveScan report: ${state.fixture}`, "", "Safe simulation. No arbitrary code or network request was executed.", "", "## Findings", ""];
-  for (const finding of state.report.findings) lines.push(`- **${finding.ruleId} (${finding.severity})** ${finding.title}: ${finding.file}:${finding.line}. ${finding.remediation}`);
-  if (state.verification) lines.push("", "## Latest verification", "", `- Status: ${state.verification.status}`, `- Target finding remains: ${state.verification.targetFindingPresent ? "yes" : "no"}`);
-  const blob = new Blob([lines.join("\n") + "\n"], { type: "text/markdown" });
-  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `gravescan-${state.fixture}.md`; link.click(); URL.revokeObjectURL(link.href);
-  setStatus("Markdown report exported.", "success");
+  try {
+    setBusy(true, "Building the before/after report.");
+    const value = await request("/api/report", { fixture: state.fixture });
+    const blob = new Blob([value.markdown], { type: "text/markdown" });
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = value.filename; link.click(); URL.revokeObjectURL(link.href);
+    setStatus("Markdown report exported with before and after findings.", "success");
+  } catch (error) { setStatus(error.message, "error"); }
+  finally { setBusy(false); }
 }
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;

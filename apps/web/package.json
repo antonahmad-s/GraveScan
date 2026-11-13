@@ -11,8 +11,9 @@
   },
   "dependencies": {
     "@gravescan/fixtures": "workspace:*",
+    "@gravescan/patcher": "workspace:*",
+    "@gravescan/reporting": "workspace:*",
     "@gravescan/scanner": "workspace:*",
-    "@gravescan/simulator": "workspace:*",
-    "@gravescan/patcher": "workspace:*"
+    "@gravescan/simulator": "workspace:*"
   }
 }
