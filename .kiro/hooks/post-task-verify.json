@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Post-task verification",
+      "trigger": "PostTaskExec",
+      "action": { "type": "command", "command": "pnpm lint && pnpm typecheck && pnpm test" }
+    },
+    {
+      "name": "Documentation consistency",
+      "trigger": "PostTaskExec",
+      "action": { "type": "command", "command": "pnpm docs:check" }
+    }
+  ]
+}

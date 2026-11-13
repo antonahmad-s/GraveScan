@@ -1,0 +1,27 @@
+{
+  "name": "gravescan",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.26.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "docs:check": "node scripts/docs-check.ts",
+    "repo:check": "node scripts/repo-check.ts",
+    "gravescan": "node packages/cli/src/main.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.17.0",
+    "fast-check": "^3.23.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  }
+}

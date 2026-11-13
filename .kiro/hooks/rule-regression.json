@@ -1,0 +1,11 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Rule regression on scanner/simulator/fixtures change",
+      "trigger": "PostFileSave",
+      "matcher": "packages/(scanner|simulator|fixtures)/",
+      "action": { "type": "command", "command": "pnpm vitest run packages/scanner packages/simulator packages/fixtures" }
+    }
+  ]
+}

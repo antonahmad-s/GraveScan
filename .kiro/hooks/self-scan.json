@@ -1,0 +1,11 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Self-scan Kiro configuration",
+      "trigger": "PostFileSave",
+      "matcher": "^\\.kiro/(settings|agents|hooks|steering)/",
+      "action": { "type": "command", "command": "pnpm gravescan scan --target .kiro --format json" }
+    }
+  ]
+}
