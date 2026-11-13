@@ -36,6 +36,30 @@ describe("unifiedDiff", () => {
   });
 });
 
+function changedLines(diff: string): string[] {
+  return diff.split("\n").filter((line) => /^[-+](?![-+]{2} )/.test(line));
+}
+
+describe("minimal diffs", () => {
+  it.each([
+    ["unsafe-mcp", "GRAVE-001", ['-      "autoApprove": ["run_command", "read_file", "write_file"],', '+      "autoApprove": ["read_file", "write_file"],']],
+    ["unsafe-mcp", "GRAVE-009", ['-        "API_TOKEN": "GRAVESCAN_CANARY_DO_NOT_USE_123"', '+        "API_TOKEN": "${API_TOKEN}"']],
+    ["unbounded-hook", "GRAVE-003", ['-      "action": { "type": "command", "command": "sh $SAVED_FILE_PATH" }', '+      "action": { "type": "command", "command": "pnpm test" }']],
+  ] as const)("%s %s changes only the risky line", (fixture, ruleId, expected) => {
+    const workCopy = copy(fixture);
+    const patch = generatePatch(workCopy, finding(workCopy, ruleId), base);
+    if (!patch.ok) throw new Error("patch failed");
+    expect(changedLines(patch.value.diff)).toEqual(expected);
+  });
+
+  it("GRAVE-002 adds one tools line and leaves the rest of the server untouched", () => {
+    const workCopy = copy("unsafe-mcp");
+    const patch = generatePatch(workCopy, finding(workCopy, "GRAVE-002"), base);
+    if (!patch.ok) throw new Error("patch failed");
+    expect(changedLines(patch.value.diff)).toEqual(['-      "disabled": false', '+      "disabled": false,', '+      "tools": ["read_file"]']);
+  });
+});
+
 describe("allowlisted patches", () => {
   const cases = [
     ["unsafe-mcp", "GRAVE-001", "Simulation blocked"],
@@ -85,6 +109,18 @@ describe("allowlisted patches", () => {
     if (!patch.ok) throw new Error("patch failed");
     const changed = { ...patch.value, before: "other" };
     expect(!applyPatch(workCopy, changed, base).ok).toBe(true);
+  });
+
+  it("still detects the target finding when a patch only moves it to another line", () => {
+    const workCopy = copy("unsafe-mcp");
+    const target = finding(workCopy, "GRAVE-001");
+    const patch = generatePatch(workCopy, target, base);
+    if (!patch.ok) throw new Error("patch failed");
+    const movedOnly = { ...patch.value, after: `\n\n${patch.value.before}` };
+    expect(applyPatch(workCopy, movedOnly, base).ok).toBe(true);
+    const verification = verifyPatch(workCopy, movedOnly, base);
+    expect(verification.ok && verification.value.targetFindingPresent).toBe(true);
+    expect(verification.ok && verification.value.status).toBe("Needs review");
   });
 
   it("rejects a traversal patch path", () => {

@@ -13,6 +13,8 @@ export const PatchSchema = z.object({
   reason: z.string().min(1),
   riskNote: z.string().min(1),
   baselineHighCritical: z.number().int().nonnegative(),
+  findingFile: z.string().min(1),
+  baselineRuleCount: z.number().int().positive(),
   attackScenarioId: z.string().min(1).optional(),
 });
 export type Patch = z.infer<typeof PatchSchema>;

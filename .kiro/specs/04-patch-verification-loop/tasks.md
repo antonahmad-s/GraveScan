@@ -8,3 +8,4 @@
 - [x] 6. Add test coverage for every allowlisted patch kind, original-fixture integrity, idempotence, conflicts, and traversal rejection.
 - [x] 7. Add fast-check properties in `tests/property/patcher.property.test.ts`: idempotence over repeated application, and no success status for a patch that adds High or Critical findings. Passes under Vitest.
 - [x] 8. `pnpm lint`, `pnpm typecheck`, and `pnpm test` (Vitest) pass.
+- [x] 9. Make verification robust to reformatting: count the rule's findings in the target file instead of matching the line-numbered finding ID. A move-only patch is `Needs review` (tested).
