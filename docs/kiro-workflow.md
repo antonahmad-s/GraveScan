@@ -6,7 +6,7 @@ Honest, evidence-based write-up. Fill each row as work happens; delete anything 
 |---|---|---|
 | IDE / CLI / Web / Crew | IDE or Web for specs and code; CLI for scans and CI-like runs. Note real differences here. | _TODO_ |
 | Custom agents | `scanner-analyst`, `patch-engineer`, `release-reviewer` | `.kiro/agents/` |
-| Hooks | Post-task verify, rule regression, self-scan of `.kiro`, docs check | `.kiro/hooks/` |
+| Hooks | `PostTaskExec`: `pnpm verify` and `pnpm docs:check`. `PostFileSave` on scanner/simulator/fixtures: rule regression tests. `PostFileSave` on `.kiro/{settings,agents,hooks,steering}`: `pnpm self-scan`, which runs GraveScan's own rules against this repo. | `.kiro/hooks/` |
 | Spec-driven | Five specs. Compare against vibe coding on one module. | `.kiro/specs/` |
 | Steering | Product contract, security boundaries, testing contract, UI direction | `.kiro/steering/` |
 | MCP | Custom `gravescan-dev` stdio server: `list_fixtures`, `run_fixture_scan`, `run_attack_replay`, `get_finding`, `generate_patch`, `verify_patch`. Disabled by default until a Kiro CLI user opts in. GitHub MCP optional. | `packages/mcp-dev/src/server.ts`, `.kiro/settings/mcp.json` |
@@ -27,8 +27,25 @@ Record at least one concrete case where a spec, hook, or property test caught a 
 - 2026-11-13. The testing contract requires a patch-idempotence property test. Review showed the file had never been written; only a seeded script existed. `tests/property/patcher.property.test.ts` now covers idempotence and the "no new High or Critical finding on success" property.
 - 2026-11-13. A real browser click-through at 768px found a horizontal overflow (`scrollWidth 806 > 768`) after a scan, caused by a three-column header at tablet width. Fixed with a 1060px header breakpoint and re-verified at 390, 768, and 1060px.
 
+- 2026-11-13. A tablet-width test caught keyboard focus dropping to `<body>` after Enter on a finding. `renderFindings()` cleared the list before recording which item had focus. Fixed by recording focus first and restoring it after the rebuild; the Playwright keyboard test now asserts it.
+- 2026-11-13. A before/after comparison test caught that resolving GRAVE-001 also reported GRAVE-009 as resolved. The patch reformatted `mcp.json`, moving the canary token from line 7 to line 6, and finding IDs include the line. Patch verification had the same flaw: a patch that only moved a risky line would have counted as a fix. Both now match findings by rule, file, and evidence text. A test proves a move-only patch is `Needs review`.
+
 ## Vibe vs spec comparison
 - _TODO: pick one module, note time, rework, and bugs under each approach._
 
 ## Self-scan
-GraveScan scans its own root `.kiro/` (hook `self-scan.json`). Record results here.
+`pnpm self-scan` runs GraveScan's rules against the repository's own `.kiro/` directory. It reads a fixed path, not user input, rejects symlinks and files over 1 MiB, and exits 1 on a medium or higher finding. It runs in the `self-scan.json` hook and in CI.
+
+First run, 2026-11-13: **0 findings**. That looked wrong, so the rules were checked against the repo by hand, which found two scanner defects that hid real problems:
+
+- **GRAVE-003 allowlist bypass.** The hook allowlist matched only the start of a command, so `pnpm lint && <anything>` passed. Six new tests (`&&`, `;`, `|`, `$()`, backticks, `>`) failed against the old rule. The rule now requires a full match: an approved script plus plain arguments.
+- **GRAVE-010 satisfied by documentation.** The sandbox-policy rule accepted any `.kiro` text containing `sandbox-policy`, so a spec table that only named the file counted as a policy. The rule now requires a `Sandbox policy` heading in a steering file, since steering is what the agent actually loads.
+
+Second run, after the rule fixes: **2 findings in GraveScan's own config**.
+
+| Finding | Location | Fix |
+|---|---|---|
+| GRAVE-003 High: hook runs a command outside the allowlist | `.kiro/hooks/post-task-verify.json:7`, `pnpm lint && pnpm typecheck && pnpm test` | Added a `pnpm verify` script; the hook now runs that single command |
+| GRAVE-010 Medium: no sandbox policy | project-wide | Added a `Sandbox policy` heading to `.kiro/steering/security-boundaries.md` |
+
+The third run flagged the new self-scan hook itself (`pnpm self-scan` was not in the allowlist). It was added deliberately. Current result: **0 findings**, enforced by `pnpm self-scan` in CI.
