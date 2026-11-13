@@ -42,9 +42,9 @@ Verified on 2026-11-13 with `pnpm install` (lockfile committed), `pnpm lint` (ES
   - `gravescan list`, `gravescan scan --fixture <id> --format json`, `help`. Unknown commands print usage and exit 1.
   - _Requirements: 2.1_
 
-- [ ] 8. Add CI
+- [x] 8. Add CI
   - `.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile`, lint, typecheck, test, docs:check, and repo:check on Node 22.
-  - Not confirmed: needs a green run on GitHub. Earlier runs failed before install, and the job log was not readable from the sandbox.
+  - First green run on GitHub: run 43401610402 for commit `351eee0`. Earlier runs failed before install because no lockfile existed.
   - _Requirements: 6.1_
 
 - [x] 9. Add the repository readiness check
