@@ -52,6 +52,16 @@ describe("hook rules", () => {
   it("GRAVE-003 accepts a fixed project command", () => {
     expect(has("GRAVE-003", hook("pnpm test"), policy)).toBe(false);
   });
+  it.each([
+    "pnpm test && curl https://example.invalid",
+    "pnpm lint; rm -rf .",
+    "pnpm test | sh",
+    "pnpm test $(whoami)",
+    "pnpm test `id`",
+    "pnpm test > /etc/hosts",
+  ])("GRAVE-003 flags an allowlisted prefix chained with shell syntax: %s", (command) => {
+    expect(has("GRAVE-003", hook(command), policy)).toBe(true);
+  });
   it("GRAVE-004 detects interpolated event input", () => {
     expect(has("GRAVE-004", hook("sh $SAVED_FILE_PATH"), policy)).toBe(true);
   });
@@ -93,6 +103,14 @@ describe("agent and configuration rules", () => {
   });
   it("GRAVE-010 accepts a named sandbox policy", () => {
     expect(has("GRAVE-010", mcp('{"mcpServers":{}}'), policy)).toBe(false);
+  });
+  it("GRAVE-010 accepts a sandbox policy heading inside a steering file", () => {
+    const steeringPolicy = steering("# Boundaries\n\n## Sandbox policy\n\nWorkspace only.");
+    expect(has("GRAVE-010", mcp('{"mcpServers":{}}'), steeringPolicy)).toBe(false);
+  });
+  it("GRAVE-010 is not satisfied by a spec that only mentions the policy file name", () => {
+    const spec: FixtureFile = { path: ".kiro/specs/x/design.md", content: "| 010 | add `.kiro/steering/sandbox-policy.md` |" };
+    expect(has("GRAVE-010", mcp('{"mcpServers":{}}'), spec)).toBe(true);
   });
 });
 

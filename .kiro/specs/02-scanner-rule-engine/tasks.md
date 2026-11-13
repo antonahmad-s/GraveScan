@@ -8,3 +8,5 @@
 - [x] 6. Add fast-check properties for determinism, malformed input, and evidence validity in `tests/property/scanner.property.test.ts`. Passes under Vitest.
 - [x] 7. Extend CLI: `gravescan scan --fixture <id> --format json`; reject arbitrary targets and unknown options.
 - [x] 8. `pnpm lint`, `pnpm typecheck`, and `pnpm test` (Vitest) pass.
+- [x] 9. Add `gravescan self-scan` with `--fail-on`, enable the self-scan hook, and run it in CI. Requirements 5.4 and 5.5.
+- [x] 10. Fix two scanner defects found while dogfooding: GRAVE-003 prefix-only allowlist match, and GRAVE-010 accepting any text that named the policy file. Covered by new rule tests.

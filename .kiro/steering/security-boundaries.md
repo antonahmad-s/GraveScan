@@ -1,5 +1,7 @@
 # Security Boundaries
 
+## Sandbox policy
+
 Forbidden in all code, tests, and generated tasks:
 
 - Arbitrary shell or code execution from user or fixture input.

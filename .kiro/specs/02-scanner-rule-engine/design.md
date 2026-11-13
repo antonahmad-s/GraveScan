@@ -41,14 +41,14 @@ The finding ID is stable: `ruleId:file:line`. A duplicate rule hit on the same l
 |---|---|---:|---|
 | 001 | enabled MCP JSON `autoApprove` contains shell/execution names | High | remove approval; require user approval |
 | 002 | enabled MCP server has no non-empty `tools`/`toolAllowlist`/`allowedTools` array | High | add an explicit minimum allowlist |
-| 003 | hook command starts a shell/interpreter or outside approved `pnpm gravescan` command set | High | replace with fixed allowlisted command |
+| 003 | hook command is not a full match for an approved `pnpm` script plus plain arguments; any shell syntax (`&&`, `;`, `\|`, `$`, backtick, `>`) fails | High | replace with fixed allowlisted command |
 | 004 | hook command expands `$SAVED_FILE`, `$INPUT`, or `{{input}}` | Medium | remove interpolation; use validated fixed input |
 | 005 | steering text asks to print/export secrets, credentials, or environment variables | Critical | remove secret request and reaffirm boundary |
 | 006 | steering text grants any-machine/path-outside-workspace access | High | restrict access to workspace-relative paths |
 | 007 | agent JSON includes a network capability or web tool but does not state a reason | Medium | remove it or document business reason |
 | 008 | internal finding contract validator sees missing remediation | Low | add concrete remediation before returning finding |
 | 009 | config assignment contains a secret-like key and a non-placeholder value, including fake canaries | High | move to environment reference or delete demo value |
-| 010 | no Kiro text document states a sandbox policy | Medium | add `.kiro/steering/sandbox-policy.md` |
+| 010 | no steering file has a `Sandbox policy` heading (specs and other docs do not count, because the agent does not load them as guidance) | Medium | add `.kiro/steering/sandbox-policy.md` |
 
 For MCP server structure, `disabled: true` excludes GRAVE-001 and GRAVE-002. This lets GraveScan's own disabled development MCP config remain clean.
 
@@ -68,7 +68,13 @@ RULES: readonly RuleDefinition[]
 gravescan scan --fixture unsafe-mcp --format json
 ```
 
-Only `--fixture` is accepted. `--target` is rejected deliberately: the public MVP has controlled fixtures only. The project self-scan hook remains disabled until a later, separately specified local-only capability is designed.
+Only `--fixture` is accepted. `--target` is rejected deliberately: the public MVP has controlled fixtures only.
+
+```
+gravescan self-scan --format json [--fail-on <severity>]
+```
+
+`self-scan` reads this repository's own `.kiro/` through `loadProjectKiro()` in `@gravescan/fixtures`. The root comes from the package location, never from an argument. It reads `.json`, `.md`, `.yaml`, `.yml`, and `.txt` files, rejects symlinks, and stops at 1 MiB per file or 500 files. It is CLI-only and is not exposed in the web UI. `--fail-on` exits 1 when a finding meets the threshold, which lets the Kiro hook and CI enforce it.
 
 ## Tests
 

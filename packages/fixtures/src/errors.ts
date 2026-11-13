@@ -3,6 +3,7 @@ export const REJECTION_REASONS = [
   "absolute",
   "symlink-escape",
   "not-found",
+  "too-large",
 ] as const;
 
 export type RejectionReason = (typeof REJECTION_REASONS)[number];

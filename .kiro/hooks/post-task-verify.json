@@ -4,7 +4,8 @@
     {
       "name": "Post-task verification",
       "trigger": "PostTaskExec",
-      "action": { "type": "command", "command": "pnpm lint && pnpm typecheck && pnpm test" }
+      "timeout": 180,
+      "action": { "type": "command", "command": "pnpm verify" }
     },
     {
       "name": "Documentation consistency",

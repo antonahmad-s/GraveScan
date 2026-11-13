@@ -48,4 +48,25 @@ describe("run", () => {
     expect(capture(["scan", "--fixture", "unsafe-mcp", "--format", "text"]).code).toBe(1);
     expect(capture(["scan", "--fixture", "not-a-fixture", "--format", "json"]).code).toBe(1);
   });
+
+  it("fails a fixture scan with --fail-on when a finding meets the threshold", () => {
+    const result = capture(["scan", "--fixture", "unsafe-mcp", "--format", "json", "--fail-on", "high"]);
+    expect(result.code).toBe(1);
+    expect(result.err[0]).toMatch(/^3 finding\(s\) at or above high: /);
+  });
+
+  it("rejects an unknown --fail-on level", () => {
+    expect(capture(["scan", "--fixture", "unsafe-mcp", "--format", "json", "--fail-on", "severe"]).code).toBe(1);
+  });
+
+  it("self-scans this project's .kiro with no medium or higher findings", () => {
+    const result = capture(["self-scan", "--format", "json", "--fail-on", "medium"]);
+    expect(result.err).toEqual([]);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.out[0] ?? "{}")).toEqual({ findings: [], diagnostics: [] });
+  });
+
+  it("does not let self-scan accept a target path", () => {
+    expect(capture(["self-scan", "--format", "json", "--fixture", "unsafe-mcp"]).code).toBe(1);
+  });
 });

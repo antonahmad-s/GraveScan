@@ -46,12 +46,13 @@ function sourceFinding(
 
 const shellCapability = /(?:run[_-]?command|shell|terminal|(?:^|[_-])exec(?:ute)?(?:$|[_-])|bash|powershell|(?:^|[_-])cmd(?:$|[_-]))/i;
 const configuredToolLists = ["tools", "toolAllowlist", "allowedTools"] as const;
-const approvedHookCommand = /^pnpm (?:lint|typecheck|test|docs:check|repo:check|gravescan(?:\s|$)|vitest run(?:\s|$))/;
+// Full match: an approved script plus plain arguments. Any shell syntax (&&, ;, |, $, `, >) fails.
+const approvedHookCommand = /^pnpm (?:lint|typecheck|test|verify|self-scan|docs:check|repo:check|gravescan|vitest run)(?: [A-Za-z0-9_./:=-]+)*$/;
 const unsafeHookInput = /\$(?:SAVED_FILE(?:_PATH)?|INPUT)|\{\{\s*input\s*\}\}/i;
 const secretRequest = /\b(?:print|export|send|reveal)\b[^\n]{0,100}\b(?:secret|credential|environment variable|env(?:ironment)?\s+variable)/i;
 const broadFilesystemGrant = /(?:\byou may\b[^\n]{0,100}\b(?:any path|outside the workspace|outside workspace)|\bany path on the machine\b|\baccess outside the workspace\b)/i;
 const secretAssignment = /(?:["']?[a-z0-9_]*(?:token|secret|password|api_?key)[a-z0-9_]*["']?\s*[:=]\s*["'])([^"'\s]{6,})/i;
-const declaredSandboxPolicy = /^#\s*sandbox policy\b|\bsandbox-policy\b/i;
+const sandboxPolicyHeading = /^#{1,6}\s*sandbox policy\b/im;
 const explicitDenial = /\b(?:never|do not|don't|must not|forbidden|dilarang)\b/i;
 
 function riskyLine(document: ScanDocument, expression: RegExp): { line: number; evidence: string } | undefined {
@@ -284,7 +285,8 @@ const rule010: RuleDefinition = {
   severity: "medium",
   evaluate(documents) {
     const kiroDocuments = documents.filter(hasKiroPath);
-    const policyExists = kiroDocuments.some((document) => declaredSandboxPolicy.test(document.content));
+    // Only steering is loaded as agent guidance; a spec that mentions the policy does not enforce it.
+    const policyExists = steeringDocuments(documents).some((document) => sandboxPolicyHeading.test(document.content));
     const target = kiroDocuments[0];
     if (policyExists || target === undefined) return [];
     return [

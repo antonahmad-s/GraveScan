@@ -39,6 +39,8 @@ Create GraveScan's deterministic static scanner. It reads controlled fixture fil
 - 5.1 THE scanner SHALL scan a fixture selected by its known fixture ID.
 - 5.2 THE CLI command `gravescan scan --fixture <id> --format json` SHALL print deterministic JSON and exit 0.
 - 5.3 THE CLI SHALL reject unknown options, unsupported format, unknown fixture ID, and attempts to scan arbitrary repository paths.
+- 5.4 THE CLI command `gravescan self-scan --format json` SHALL scan this repository's own `.kiro/` directory from a fixed path, reject symlinks and files over 1 MiB, and accept no target path.
+- 5.5 WHEN `--fail-on <severity>` is given, THE CLI SHALL exit 1 if any finding is at or above that severity.
 
 ### 6. Tests
 - 6.1 EVERY rule SHALL have a positive and a negative test.
