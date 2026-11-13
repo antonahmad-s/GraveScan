@@ -43,7 +43,7 @@ pnpm dev
 
 `pnpm dev` starts the local workbench at `http://127.0.0.1:3000`. The UI accepts only its three bundled fixtures. It cannot upload repositories, execute shell code, or make outbound requests.
 
-The current web runtime is a dependency-free Node 22 server so the demo can run in the sandbox where npm registry access is unavailable. This is a deliberate deviation from the planned Next.js runtime, recorded in [Spec 05](.kiro/specs/05-product-ui-demo-flow/design.md). The scanner, simulator, patcher, server, and CLI are TypeScript. Migrating the UI shell to Next.js remains a follow-up after the normal npm toolchain is available.
+The web runtime is a dependency-free Node 22 server rather than the Next.js shell the PRD planned. It was built while the sandbox had no npm registry access, and the deviation is recorded in [Spec 05](.kiro/specs/05-product-ui-demo-flow/design.md). The scanner, simulator, patcher, server, and CLI are TypeScript. Moving the UI shell to Next.js is an open decision, not a pending fix.
 
 ## Repository layout
 

@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# The sandbox mounts /root read-only, so keep pnpm's store inside the ignored workspace folder.
+storeDir: .pnpm-store

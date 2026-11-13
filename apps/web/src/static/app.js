@@ -134,7 +134,9 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $("#theme-toggle").textContent = theme === "dark" ? "Light theme" : "Dark theme";
   $("#theme-toggle").setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
-  try { localStorage.setItem("gravescan-theme", theme); } catch { }
+  try { localStorage.setItem("gravescan-theme", theme); } catch {
+    // Storage can be blocked (private mode); the theme still applies to this page.
+  }
 }
 $("#theme-toggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
 scanButton.addEventListener("click", () => runScan(false));

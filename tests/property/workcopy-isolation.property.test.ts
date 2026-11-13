@@ -19,7 +19,7 @@ type Operation = { kind: "create" | "mutate" | "reset"; id: FixtureId };
 
 const operations = fc.array(
   fc.record({
-    kind: fc.constantFrom("create", "mutate", "reset"),
+    kind: fc.constantFrom<Operation["kind"]>("create", "mutate", "reset"),
     id: fc.constantFrom(...FIXTURE_IDS),
   }),
   { maxLength: 8 },

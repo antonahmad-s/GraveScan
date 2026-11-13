@@ -12,4 +12,18 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ["apps/web/src/static/**/*.js"],
+    languageOptions: {
+      sourceType: "module",
+      globals: {
+        Blob: "readonly",
+        URL: "readonly",
+        document: "readonly",
+        fetch: "readonly",
+        localStorage: "readonly",
+        window: "readonly",
+      },
+    },
+  },
 );
