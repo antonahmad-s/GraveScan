@@ -1,0 +1,40 @@
+{
+  "name": "gravescan",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.26.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.e2e.json",
+    "test": "vitest run",
+    "docs:check": "node scripts/docs-check.ts",
+    "repo:check": "node scripts/repo-check.ts",
+    "self-scan": "node packages/cli/src/main.ts self-scan --format json --fail-on medium",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "test:e2e": "playwright test",
+    "dev": "node apps/web/src/server.ts",
+    "gravescan": "node packages/cli/src/main.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@gravescan/cli": "workspace:*",
+    "@gravescan/fixtures": "workspace:*",
+    "@gravescan/mcp-dev": "workspace:*",
+    "@gravescan/patcher": "workspace:*",
+    "@gravescan/reporting": "workspace:*",
+    "@gravescan/scanner": "workspace:*",
+    "@gravescan/simulator": "workspace:*",
+    "@gravescan/web": "workspace:*",
+    "@playwright/test": "1.62.1",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.17.0",
+    "fast-check": "^3.23.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Self-scan Kiro configuration",
+      "description": "Runs GraveScan's own rules against this project's .kiro/ whenever Kiro config changes. Exits non-zero on a medium or higher finding.",
+      "trigger": "PostFileSave",
+      "matcher": "\\.kiro/(settings|agents|hooks|steering)/",
+      "timeout": 60,
+      "action": { "type": "command", "command": "pnpm self-scan" }
+    }
+  ]
+}

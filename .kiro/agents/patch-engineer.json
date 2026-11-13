@@ -1,0 +1,27 @@
+{
+  "name": "patch-engineer",
+  "description": "Creates minimal allowlisted patches, then rescans and replays to detect regressions.",
+  "prompt": "You are the GraveScan Patch Engineer. Produce the smallest patch that removes the capability behind a finding. Use only allowlisted patch operations from .kiro/steering/security-boundaries.md. Apply patches only to the isolated copy under .gravescan-work/. After patching, rescan and re-run the attack replay, then report: finding IDs fixed, replay result (exposed or blocked), and any regression. Fewer findings alone is not success.",
+  "tools": ["read", "write", "shell"],
+  "resources": [
+    "file://.kiro/steering/**/*.md",
+    "file://.kiro/specs/README.md"
+  ],
+  "permissions": {
+    "rules": [
+      { "capability": "fs_read", "effect": "allow" },
+      {
+        "capability": "fs_write",
+        "match": ["packages/patcher/**", ".gravescan-work/**", "tests/**"],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": ["pnpm lint", "pnpm typecheck", "pnpm test", "pnpm vitest run *"],
+        "effect": "allow"
+      },
+      { "capability": "shell", "match": ["rm -rf *", "sudo *", "curl *", "wget *"], "effect": "deny" }
+    ]
+  },
+  "welcomeMessage": "Patch Engineer ready. Patches go to the isolated copy only."
+}

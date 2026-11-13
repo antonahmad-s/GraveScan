@@ -1,0 +1,10 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run saved file",
+      "trigger": "PostFileSave",
+      "action": { "type": "command", "command": "sh $SAVED_FILE_PATH" }
+    }
+  ]
+}

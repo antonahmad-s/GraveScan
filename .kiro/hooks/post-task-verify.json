@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Post-task verification",
+      "trigger": "PostTaskExec",
+      "timeout": 180,
+      "action": { "type": "command", "command": "pnpm verify" }
+    },
+    {
+      "name": "Documentation consistency",
+      "trigger": "PostTaskExec",
+      "action": { "type": "command", "command": "pnpm docs:check" }
+    }
+  ]
+}

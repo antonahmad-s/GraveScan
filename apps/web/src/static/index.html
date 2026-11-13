@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GraveScan: Security evidence workbench</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#workbench">Skip to workspace</a>
+    <header class="topbar">
+      <div class="wordmark" aria-label="GraveScan"><span>GRAVE</span>SCAN</div>
+      <p class="topbar-context">Security evidence workbench</p>
+      <div class="topbar-actions">
+        <span id="status-line" role="status" aria-live="polite">Choose a controlled fixture to begin.</span>
+        <button id="theme-toggle" class="quiet-button" type="button" aria-label="Switch to light theme">Light theme</button>
+      </div>
+    </header>
+
+    <main id="workbench" class="workbench" aria-busy="false">
+      <aside class="fixture-rail" aria-labelledby="fixture-heading">
+        <div>
+          <p class="section-label">Controlled fixtures</p>
+          <h1 id="fixture-heading">Choose a case</h1>
+          <p class="muted">These files are intentionally vulnerable test data. No upload or live repository access is available.</p>
+        </div>
+        <div id="fixture-list" class="fixture-list" aria-label="Available fixture repositories"></div>
+        <button id="reset-button" class="quiet-button full-width" type="button" disabled>Reset isolated copy</button>
+        <p class="boundary-note">Safe simulation. No arbitrary code or network request was executed.</p>
+      </aside>
+
+      <section class="evidence-board" aria-labelledby="evidence-heading">
+        <header class="panel-heading">
+          <div>
+            <p class="section-label">Evidence board</p>
+            <h2 id="evidence-heading">Static scan</h2>
+          </div>
+          <div class="scan-controls">
+            <button id="scan-button" class="primary-button" type="button" disabled>Run scan</button>
+            <button id="export-button" class="quiet-button" type="button" disabled>Export Markdown</button>
+          </div>
+        </header>
+
+        <div class="filters" aria-label="Finding filters">
+          <label>Severity
+            <select id="severity-filter" disabled>
+              <option value="all">All severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label>Rule
+            <select id="rule-filter" disabled><option value="all">All rules</option></select>
+          </label>
+        </div>
+
+        <div id="finding-state" class="state-panel" role="status">Select a fixture, then run a scan.</div>
+        <ol id="finding-list" class="finding-list" aria-label="Scan findings"></ol>
+      </section>
+
+      <section class="case-file" aria-labelledby="case-heading">
+        <header class="panel-heading">
+          <div>
+            <p class="section-label">Case file</p>
+            <h2 id="case-heading">Finding detail</h2>
+          </div>
+        </header>
+        <div id="detail-state" class="state-panel">Choose a finding to inspect its evidence trail.</div>
+        <article id="finding-detail" class="finding-detail" aria-live="polite"></article>
+      </section>
+    </main>
+
+    <footer class="footer-note">GraveScan reports evidence and verification status. It does not claim that a project is fully secure.</footer>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

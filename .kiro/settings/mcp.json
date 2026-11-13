@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "gravescan-dev": {
+      "command": "node",
+      "args": ["packages/mcp-dev/src/server.ts"],
+      "disabled": true,
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,10 @@
+.git
+**/node_modules
+.pnpm-store
+.gravescan-work
+playwright-report
+test-results
+coverage
+*.log
+.env
+.env.*

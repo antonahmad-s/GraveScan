@@ -1,0 +1,14 @@
+{
+  "name": "@gravescan/scanner",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas.ts"
+  },
+  "dependencies": {
+    "@gravescan/fixtures": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}

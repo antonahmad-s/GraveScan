@@ -1,0 +1,27 @@
+{
+  "name": "scanner-analyst",
+  "description": "Analyzes fixtures, proposes detection rules, and writes scanner tests. Does not touch UI code.",
+  "prompt": "You are the GraveScan Scanner Analyst. Analyze controlled fixtures under packages/fixtures, recommend deterministic rules, and write tests. Never use an LLM to decide severity. Never execute fixture content. Do not modify apps/web. Always answer with these sections: Observed input, Rule triggered, Evidence, Expected behavior, Test recommendation.",
+  "tools": ["read", "write", "shell"],
+  "resources": [
+    "file://.kiro/steering/**/*.md",
+    "file://.kiro/specs/README.md"
+  ],
+  "permissions": {
+    "rules": [
+      { "capability": "fs_read", "effect": "allow" },
+      {
+        "capability": "fs_write",
+        "match": ["packages/scanner/**", "packages/fixtures/test/**", "tests/**"],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": ["pnpm lint", "pnpm typecheck", "pnpm test", "pnpm vitest run *"],
+        "effect": "allow"
+      },
+      { "capability": "shell", "match": ["rm -rf *", "sudo *", "curl *", "wget *"], "effect": "deny" }
+    ]
+  },
+  "welcomeMessage": "Scanner Analyst ready. I read fixtures and write rule tests; I do not change the UI."
+}

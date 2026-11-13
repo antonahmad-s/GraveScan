@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-journal
+.gravescan-work/
+playwright-report/
+test-results/
+.pnpm-store/
+
+# NOTE: never ignore .kiro/ or any of its subfolders (Devpost disqualification risk).

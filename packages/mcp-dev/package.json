@@ -1,0 +1,13 @@
+{
+  "name": "@gravescan/mcp-dev",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/server.ts" },
+  "dependencies": {
+    "@gravescan/fixtures": "workspace:*",
+    "@gravescan/patcher": "workspace:*",
+    "@gravescan/scanner": "workspace:*",
+    "@gravescan/simulator": "workspace:*"
+  }
+}

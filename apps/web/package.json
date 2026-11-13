@@ -1,0 +1,19 @@
+{
+  "name": "@gravescan/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "node src/server.ts"
+  },
+  "dependencies": {
+    "@gravescan/fixtures": "workspace:*",
+    "@gravescan/patcher": "workspace:*",
+    "@gravescan/reporting": "workspace:*",
+    "@gravescan/scanner": "workspace:*",
+    "@gravescan/simulator": "workspace:*"
+  }
+}
