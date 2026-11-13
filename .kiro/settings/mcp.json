@@ -1,10 +1,9 @@
 {
   "mcpServers": {
     "gravescan-dev": {
-      "command": "pnpm",
-      "args": ["--filter", "mcp-dev", "start"],
+      "command": "node",
+      "args": ["packages/mcp-dev/src/server.ts"],
       "disabled": true,
-      "autoApprove": [],
       "env": {}
     }
   }

@@ -8,5 +8,5 @@ export { DEFAULT_WORK_BASE, FIXTURES_DATA_ROOT } from "./paths.ts";
 export { err, ok } from "./result.ts";
 export type { Err, Ok, Result } from "./result.ts";
 export { checkRelative, isInside, resolveSafe } from "./safe-path.ts";
-export { createWorkCopy, resetWorkCopy } from "./workcopy.ts";
+export { createWorkCopy, readWorkCopy, resetWorkCopy } from "./workcopy.ts";
 export type { WorkCopy } from "./workcopy.ts";

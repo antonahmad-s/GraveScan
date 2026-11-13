@@ -38,9 +38,12 @@ Requires Node 22.18 or newer and pnpm 10.
 pnpm install
 pnpm lint && pnpm typecheck && pnpm test
 pnpm gravescan list
+pnpm dev
 ```
 
-Available now: the fixture loader, the isolated work copy, and the `gravescan list` command. The scanner, simulator, patcher, and web UI arrive in Specs 02 to 05, so `gravescan scan` and the web app do not exist yet.
+`pnpm dev` starts the local workbench at `http://127.0.0.1:3000`. The UI accepts only its three bundled fixtures. It cannot upload repositories, execute shell code, or make outbound requests.
+
+The current web runtime is a dependency-free Node 22 server so the demo can run in the sandbox where npm registry access is unavailable. This is a deliberate deviation from the planned Next.js runtime, recorded in [Spec 05](.kiro/specs/05-product-ui-demo-flow/design.md). The scanner, simulator, patcher, server, and CLI are TypeScript. Migrating the UI shell to Next.js remains a follow-up after the normal npm toolchain is available.
 
 ## Repository layout
 
@@ -50,6 +53,7 @@ packages/scanner/    parser + rule engine
 packages/simulator/  safe attack scenarios
 packages/patcher/    patch generation + verification
 packages/fixtures/   intentionally vulnerable fixtures (FAKE tokens only)
+packages/mcp-dev/     `gravescan-dev` fixed-function MCP server (disabled by default)
 packages/reporting/  before/after report + Markdown export
 tests/               property, integration, e2e
 docs/                architecture, threat model, Kiro workflow, demo script

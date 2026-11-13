@@ -10,4 +10,4 @@ Each spec follows Requirements, then Design, then Tasks.
 | 04 | patch-verification-loop | patch generator, isolated copy, diff, rescan, regression |
 | 05 | product-ui-demo-flow | workspace, findings, detail, replay, diff review, report, export |
 
-Create specs 02 to 05 one at a time, after the previous spec's tasks are done.
+Specs 01 through 05 are implemented locally. The final browser visual click-through is pending because this sandbox has no usable Chromium binary. See `docs/ui-delivery-gate.md`.

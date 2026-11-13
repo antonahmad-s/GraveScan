@@ -5,5 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "node src/server.ts"
+  },
+  "dependencies": {
+    "@gravescan/fixtures": "workspace:*",
+    "@gravescan/scanner": "workspace:*",
+    "@gravescan/simulator": "workspace:*",
+    "@gravescan/patcher": "workspace:*"
   }
 }

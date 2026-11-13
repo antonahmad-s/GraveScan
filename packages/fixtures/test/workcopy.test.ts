@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadFixture } from "../src/loader.ts";
@@ -30,6 +30,15 @@ describe("createWorkCopy", () => {
   it("returns UNKNOWN_FIXTURE and writes nothing for an unknown ID", () => {
     const result = createWorkCopy("../escape", base);
     expect(!result.ok && result.error.code).toBe("UNKNOWN_FIXTURE");
+  });
+
+  it("refuses a symlinked work-copy root", () => {
+    const source = path.join(base, "source");
+    mkdirSync(source);
+    const linked = path.join(base, "unsafe-mcp");
+    symlinkSync(source, linked);
+    const result = createWorkCopy("unsafe-mcp", base);
+    expect(!result.ok && result.error.code).toBe("PATH_REJECTED");
   });
 
   it("leaves the original fixture files unchanged", () => {

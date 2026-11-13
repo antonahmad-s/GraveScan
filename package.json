@@ -13,6 +13,7 @@
     "test": "vitest run",
     "docs:check": "node scripts/docs-check.ts",
     "repo:check": "node scripts/repo-check.ts",
+    "dev": "node apps/web/src/server.ts",
     "gravescan": "node packages/cli/src/main.ts"
   },
   "devDependencies": {

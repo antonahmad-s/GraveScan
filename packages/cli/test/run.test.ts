@@ -34,7 +34,18 @@ describe("run", () => {
     expect(result.err[0]).toBe("Missing command.");
   });
 
-  it("does not run commands that scan, because scanning is not built yet", () => {
+  it("prints a deterministic JSON scan report for a controlled fixture", () => {
+    const result = capture(["scan", "--fixture", "unsafe-mcp", "--format", "json"]);
+    expect(result.code).toBe(0);
+    expect(result.err).toEqual([]);
+    expect(JSON.parse(result.out[0] ?? "{}").findings.map((finding: { ruleId: string }) => finding.ruleId)).toEqual([
+      "GRAVE-010", "GRAVE-002", "GRAVE-009", "GRAVE-001",
+    ]);
+  });
+
+  it("rejects arbitrary targets, unknown options, invalid formats, and unknown fixtures", () => {
     expect(capture(["scan", "--target", ".kiro"]).code).toBe(1);
+    expect(capture(["scan", "--fixture", "unsafe-mcp", "--format", "text"]).code).toBe(1);
+    expect(capture(["scan", "--fixture", "not-a-fixture", "--format", "json"]).code).toBe(1);
   });
 });

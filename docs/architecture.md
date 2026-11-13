@@ -13,6 +13,6 @@ flowchart LR
   R2 --> V
 ```
 
-Packages: `scanner`, `simulator`, `patcher`, `reporting`, `fixtures`; consumed by `apps/web` and the `gravescan` CLI. A dev-only MCP server (`gravescan-dev`) exposes the same functions to Kiro agents.
+Packages: `scanner`, `simulator`, `patcher`, `reporting`, `fixtures`, and `mcp-dev`; consumed by the CLI and the local web server in `apps/web/src/server.ts`. The server exposes only fixed fixture/replay/patch endpoints and serves the dependency-free workbench. The dev-only `gravescan-dev` MCP server exposes the same fixed flow over stdio and is disabled by default in `.kiro/settings/mcp.json`.
 
 Full requirements: see the PRD and `.kiro/specs/`.
