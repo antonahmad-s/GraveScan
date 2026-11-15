@@ -1,10 +1,5 @@
-import {
-  readWorkCopy,
-  type FixtureFile,
-  type Result,
-  type WorkCopy,
-} from "@gravescan/fixtures";
-import { scanFiles, type Finding } from "@gravescan/scanner";
+import type { FixtureFile, Result } from "@gravescan/fixtures/browser";
+import { scanFiles, type Finding } from "@gravescan/scanner/browser";
 import type { Patch, PatchError } from "./schemas.ts";
 import { unifiedDiff } from "./diff.ts";
 
@@ -205,23 +200,20 @@ function transform(finding: Finding, before: string): { after: string; reason: s
   }
 }
 
-export function generatePatch(
-  copy: WorkCopy,
+export function generatePatchForFiles(
+  files: readonly FixtureFile[],
   finding: Finding,
-  base?: string,
 ): Result<Patch, PatchError> {
-  const loaded = readWorkCopy(copy, base);
-  if (!loaded.ok) return patchError("WORK_COPY_INVALID", loaded.error.code);
-  const baselineHighCritical = highCriticalCount(loaded.value);
+  const baselineHighCritical = highCriticalCount(files);
   const baselineRuleCount = Math.max(
     1,
-    scanFiles(loaded.value).findings.filter((item) => item.ruleId === finding.ruleId && item.file === finding.file).length,
+    scanFiles(files).findings.filter((item) => item.ruleId === finding.ruleId && item.file === finding.file).length,
   );
   const identity = { findingFile: finding.file, baselineRuleCount };
 
   if (finding.ruleId === "GRAVE-010") {
     const file = ".kiro/steering/sandbox-policy.md";
-    const before = findFile(loaded.value, file) ?? "";
+    const before = findFile(files, file) ?? "";
     const after = "# Sandbox Policy\n\n- Only workspace-relative paths are allowed.\n- No arbitrary shell command, code execution, or outbound network request is allowed.\n";
     return {
       ok: true,
@@ -241,7 +233,7 @@ export function generatePatch(
     };
   }
 
-  const before = findFile(loaded.value, finding.file);
+  const before = findFile(files, finding.file);
   if (before === undefined) return patchError("PATCH_FILE_MISSING", finding.file);
   const update = transform(finding, before);
   if (update === undefined) return patchError("PATCH_UNSUPPORTED", finding.ruleId);
