@@ -1,4 +1,7 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { makeTempDir, removeDir } from "../../fixtures/test/helpers.ts";
 import { USAGE, run } from "../src/run.ts";
 
 function capture(argv: string[]) {
@@ -64,6 +67,42 @@ describe("run", () => {
     expect(result.err).toEqual([]);
     expect(result.code).toBe(0);
     expect(JSON.parse(result.out[0] ?? "{}")).toEqual({ findings: [], diagnostics: [] });
+  });
+
+  it("scans the .kiro folder of a chosen directory and redacts secrets in the output", () => {
+    const root = makeTempDir();
+    try {
+      mkdirSync(path.join(root, ".kiro/settings"), { recursive: true });
+      writeFileSync(path.join(root, ".kiro/settings/mcp.json"), '{\n  "mcpServers": {\n    "x": { "command": "node", "tools": ["a"], "env": { "API_KEY": "real-looking-value-123" } }\n  }\n}\n');
+      const result = capture(["scan", "--path", root, "--format", "json", "--fail-on", "high"]);
+      expect(result.code).toBe(1);
+      expect(result.out[0]).toContain("GRAVE-009");
+      expect(result.out[0]).toContain("[REDACTED]");
+      expect(result.out[0]).not.toContain("real-looking-value-123");
+    } finally {
+      removeDir(root);
+    }
+  });
+
+  it("explains a directory without a .kiro folder", () => {
+    const root = makeTempDir();
+    try {
+      const result = capture(["scan", "--path", root, "--format", "json"]);
+      expect(result.code).toBe(1);
+      expect(result.err[0]).toContain("Expected a readable .kiro/ folder");
+    } finally {
+      removeDir(root);
+    }
+  });
+
+  it("requires exactly one of --fixture and --path", () => {
+    expect(capture(["scan", "--format", "json"]).code).toBe(1);
+    expect(capture(["scan", "--fixture", "unsafe-mcp", "--path", ".", "--format", "json"]).err[0]).toBe("Use exactly one of --fixture <id> or --path <dir>.");
+  });
+
+  it("rejects prototype keys as option names and levels", () => {
+    expect(capture(["scan", "--fixture", "unsafe-mcp", "--format", "json", "--fail-on", "constructor"]).code).toBe(1);
+    expect(capture(["scan", "constructor", "x", "--format", "json"]).code).toBe(1);
   });
 
   it("does not let self-scan accept a target path", () => {

@@ -6,7 +6,7 @@
 
 ## What it does
 
-1. Pick a controlled fixture repository.
+1. Pick a controlled fixture repository, or choose your own project folder or paste an `mcp.json`.
 2. Scan Kiro configuration (`mcp.json`, hooks, agents, steering) with deterministic rules.
 3. Review findings with file, line, and evidence.
 4. Run a **safe attack replay** (deterministic state machine) and see `exposed` or `blocked`.
@@ -44,7 +44,7 @@ pnpm dev             # builds dist/ and serves it at http://127.0.0.1:3000
 
 `pnpm build` writes the static site to `dist/`. `pnpm preview` serves the same folder through Wrangler's local Workers runtime.
 
-The UI accepts only its three bundled fixtures. It cannot upload repositories, execute shell code, or make outbound requests. Its only network traffic is loading its own static files.
+The UI scans its three bundled fixtures or your own `.kiro/` folder. Your files are read in the browser tab and never uploaded. Only `.json`, `.md`, `.yaml`, `.yml`, and `.txt` files inside the shallowest `.kiro/` folder are read, up to 500 files, 1 MB each, and 5 MB in total. The UI cannot execute shell code or make outbound requests; its only network traffic is loading its own static files. Secret-like values appear as `[REDACTED]` in findings, diffs, and exported reports. Patches apply to an in-memory copy, so you review the diff and apply it to your repository yourself.
 
 ### CLI
 
@@ -52,8 +52,11 @@ The UI accepts only its three bundled fixtures. It cannot upload repositories, e
 pnpm gravescan list
 pnpm gravescan scan --fixture unsafe-mcp --format json
 pnpm gravescan scan --fixture unsafe-mcp --format json --fail-on high   # exits 1 on a High or Critical finding
+pnpm gravescan scan --path ../my-project --format json --fail-on high     # scans ../my-project/.kiro/
 pnpm gravescan self-scan --format json
 ```
+
+`--path` reads `<dir>/.kiro/` only and rejects symlinks. The CLI prints secret-like values as `[REDACTED]`, so its output is safe for CI logs.
 
 ### End-to-end tests
 

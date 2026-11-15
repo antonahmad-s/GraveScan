@@ -4,7 +4,9 @@ GraveScan itself is a target, especially as a public demo.
 
 | Threat | Mitigation |
 |---|---|
-| Arbitrary repo upload leading to code execution | No upload. The web UI accepts fixture IDs only. `self-scan` reads the repo's own `.kiro/` from a fixed path and is CLI-only. |
+| Arbitrary repo upload leading to code execution | No upload. A visitor's own files are read as text in their tab and only parsed, never executed. `scan --path` and `self-scan` read `.kiro/` text files only and reject symlinks. |
+| Hostile or oversized local files freeze the tab | Only `.kiro/` text files are read: 500 files, 1 MB each, 5 MB in total, checked before reading and again at the engine. Secret matching is linear time; a test scans 200 KB hostile lines. |
+| Real secrets shown on screen, in CI logs, or in shared reports | Engine responses and CLI output pass through `redactDeep`; secret-like values become `[REDACTED]` in evidence, diffs, and Markdown reports |
 | Path traversal in fixture or patch paths | Reject `..`, absolute paths, escaping symlinks |
 | Simulator used for SSRF or exfiltration | No network code in simulator; bounded static steps. The page only fetches its own static files (Playwright test) |
 | Patch modifies originals | The web engine patches an in-memory copy in the visitor's tab; the CLI patches a copy under `.gravescan-work/` |

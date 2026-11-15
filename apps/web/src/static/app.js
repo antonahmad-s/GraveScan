@@ -1,10 +1,11 @@
-import { createEngine, EngineError } from "./engine.js";
+import { createEngine, EngineError, LOCAL_PROJECT, planLocalImport } from "./engine.js";
 
 const state = { fixture: null, report: null, selected: null, lastFinding: null, replay: null, patch: null, verification: null, busy: false };
 const fixtureNames = {
   "unsafe-mcp": "Unsafe MCP",
   "unbounded-hook": "Unbounded hook",
   "steering-injection": "Steering injection",
+  [LOCAL_PROJECT]: "Your project",
 };
 const $ = (selector) => document.querySelector(selector);
 const workbench = $("#workbench");
@@ -19,6 +20,12 @@ const resetButton = $("#reset-button");
 const exportButton = $("#export-button");
 const severityFilter = $("#severity-filter");
 const ruleFilter = $("#rule-filter");
+const folderButton = $("#folder-button");
+const folderInput = $("#folder-input");
+const pasteInput = $("#paste-input");
+const pasteButton = $("#paste-button");
+const localSummary = $("#local-summary");
+let localLabel = "";
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
@@ -59,7 +66,7 @@ function restoreFocus(container, attribute, key) {
 }
 function renderFixtures(fixtures) {
   const focused = focusedKey(fixtureList, "data-fixture");
-  fixtureList.innerHTML = fixtures.map((fixture) => `<button class="fixture-button" type="button" data-fixture="${escapeHtml(fixture)}" aria-pressed="${fixture === state.fixture}"><strong>${escapeHtml(fixtureNames[fixture] || fixture)}</strong><span>${escapeHtml(fixture)}</span></button>`).join("");
+  fixtureList.innerHTML = fixtures.map((fixture) => `<button class="fixture-button" type="button" data-fixture="${escapeHtml(fixture)}" aria-pressed="${fixture === state.fixture}"><strong>${escapeHtml(fixtureNames[fixture] || fixture)}</strong><span>${escapeHtml(fixture === LOCAL_PROJECT ? localLabel : fixture)}</span></button>`).join("");
   fixtureList.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => chooseFixture(button.dataset.fixture)));
   restoreFocus(fixtureList, "data-fixture", focused);
 }
@@ -70,6 +77,8 @@ function renderControls() {
   exportButton.disabled = !state.report || state.busy;
   severityFilter.disabled = !state.report || state.busy;
   ruleFilter.disabled = !state.report || state.busy;
+  folderButton.disabled = !engine || state.busy;
+  pasteButton.disabled = !engine || state.busy;
 }
 function filteredFindings() {
   if (!state.report) return [];
@@ -123,7 +132,7 @@ function renderDetail() {
 }
 async function chooseFixture(fixture) {
   state.fixture = fixture; state.report = null; state.selected = null; state.lastFinding = null; state.replay = null; state.patch = null; state.verification = null;
-  setStatus(`${fixtureNames[fixture]} selected. Run a scan when ready.`); renderFixtures(Object.keys(fixtureNames)); renderControls(); renderFindings(); renderDetail();
+  setStatus(`${fixtureNames[fixture]} selected. Run a scan when ready.`); renderFixtures(engine.fixtures()); renderControls(); renderFindings(); renderDetail();
 }
 async function runScan(reset = false) {
   if (!state.fixture) return;
@@ -160,6 +169,44 @@ async function exportMarkdown() {
   } catch (error) { setStatus(error.message, "error"); }
   finally { setBusy(false); }
 }
+// The visitor's own files: read here, validated again by the engine, and never sent anywhere.
+async function loadLocalProject(files, label) {
+  setBusy(true, "Reading your .kiro files in this tab.");
+  try {
+    const value = engine.loadLocal(files);
+    localLabel = label;
+    localSummary.hidden = false;
+    localSummary.textContent = `${value.files} file${value.files === 1 ? "" : "s"} loaded from .kiro/. Reload the page to clear them.`;
+  } catch (error) {
+    setStatus(error instanceof EngineError ? error.message : "Your files could not be loaded.", "error");
+    return;
+  } finally {
+    setBusy(false);
+  }
+  await chooseFixture(LOCAL_PROJECT);
+  await runScan(false);
+}
+async function loadChosenFolder() {
+  const files = [...folderInput.files];
+  folderInput.value = "";
+  if (files.length === 0) return;
+  const plan = planLocalImport(files.map((file) => ({ path: file.webkitRelativePath || file.name, size: file.size })));
+  if (!plan.ok) { setStatus(plan.message, "error"); return; }
+  let contents;
+  try {
+    contents = await Promise.all(plan.accepted.map(async (item) => ({ path: item.path, content: await files[item.index].text() })));
+  } catch {
+    setStatus("Your files could not be read.", "error");
+    return;
+  }
+  const skipped = plan.tooLarge.length === 0 ? "" : `, ${plan.tooLarge.length} skipped as larger than 1 MB`;
+  await loadLocalProject(contents, `${contents.length} .kiro file${contents.length === 1 ? "" : "s"}${skipped}`);
+}
+async function loadPastedConfig() {
+  const content = pasteInput.value;
+  if (content.trim() === "") { setStatus("Paste the contents of an mcp.json file first.", "error"); pasteInput.focus(); return; }
+  await loadLocalProject([{ path: ".kiro/settings/mcp.json", content }], "Pasted mcp.json");
+}
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $("#theme-toggle").textContent = theme === "dark" ? "Light theme" : "Dark theme";
@@ -172,6 +219,9 @@ $("#theme-toggle").addEventListener("click", () => setTheme(document.documentEle
 scanButton.addEventListener("click", () => runScan(false));
 resetButton.addEventListener("click", () => runScan(true));
 exportButton.addEventListener("click", exportMarkdown);
+folderButton.addEventListener("click", () => folderInput.click());
+folderInput.addEventListener("change", loadChosenFolder);
+pasteButton.addEventListener("click", loadPastedConfig);
 severityFilter.addEventListener("change", renderFindings);
 ruleFilter.addEventListener("change", renderFindings);
 try { setTheme(localStorage.getItem("gravescan-theme") || "dark"); } catch { setTheme("dark"); }

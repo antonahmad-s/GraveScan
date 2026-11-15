@@ -1,11 +1,16 @@
 import { isFixtureId, type FixtureFile, type FixtureId } from "@gravescan/fixtures/browser";
 import { applyPatchToFiles, generatePatchForFiles, verifyPatchFiles, type Patch } from "@gravescan/patcher/browser";
 import { buildMarkdownReport, compareScans, type AppliedPatchRecord } from "@gravescan/reporting";
-import { scanFiles, type ScanResult } from "@gravescan/scanner/browser";
+import { redactDeep, scanFiles, type ScanResult } from "@gravescan/scanner/browser";
 import { replayScenario } from "@gravescan/simulator";
+import { LOCAL_PROJECT, validateLocalFiles } from "./local-project.ts";
+
+export { LOCAL_LIMITS, LOCAL_PROJECT, planLocalImport } from "./local-project.ts";
+export type { LocalEntry, LocalImportPlan } from "./local-project.ts";
 
 // Runs the whole GraveScan workflow in the visitor's own page. Each engine instance is one visitor's
-// isolated copy, so there is no server state to share, evict, or leak between visitors.
+// isolated copy, so there is no server state to share, evict, or leak between visitors. Besides the
+// bundled fixtures, a visitor can load their own .kiro files as the "local-project" source.
 
 export type FixtureBundle = Readonly<Record<FixtureId, readonly FixtureFile[]>>;
 
@@ -18,6 +23,8 @@ export class EngineError extends Error {
   }
 }
 
+type SourceId = FixtureId | typeof LOCAL_PROJECT;
+
 type FixtureState = {
   files: FixtureFile[];
   readonly baseline: ScanResult;
@@ -26,7 +33,10 @@ type FixtureState = {
 };
 
 export type Engine = {
-  readonly fixtures: () => FixtureId[];
+  /** Bundled fixture IDs, followed by "local-project" once a visitor has loaded their own files. */
+  readonly fixtures: () => SourceId[];
+  /** Validates and stores the visitor's own .kiro files, replacing any earlier local project. */
+  readonly loadLocal: (files: unknown) => { fixture: typeof LOCAL_PROJECT; files: number };
   readonly call: (route: string, payload: Record<string, unknown>) => unknown;
 };
 
@@ -34,33 +44,43 @@ function copyFiles(files: readonly FixtureFile[]): FixtureFile[] {
   return files.map((file) => ({ path: file.path, content: file.content }));
 }
 
-// Responses are cloned so callers cannot mutate engine state by editing a returned object.
+// Responses are fresh copies, so callers cannot mutate engine state by editing a returned object,
+// and secret-like values are redacted so evidence, diffs, and reports are safe to show or share.
 function respond<T>(value: T): T {
-  return structuredClone(value);
+  return redactDeep(structuredClone(value));
 }
 
 export function createEngine(bundle: FixtureBundle): Engine {
-  const states = new Map<FixtureId, FixtureState>();
+  const states = new Map<SourceId, FixtureState>();
   const fixtureIds = Object.keys(bundle).filter((id): id is FixtureId => isFixtureId(id) && Array.isArray(bundle[id])).sort();
   // Snapshot the pristine files once so later edits to the caller's bundle cannot reach a reset.
-  const pristine = new Map(fixtureIds.map((id) => [id, copyFiles(bundle[id])] as const));
+  const pristine = new Map<SourceId, FixtureFile[]>(fixtureIds.map((id) => [id, copyFiles(bundle[id])] as const));
 
-  function fixtureFrom(payload: Record<string, unknown>): FixtureId {
+  function fixtureFrom(payload: Record<string, unknown>): SourceId {
     const fixture = payload.fixture;
+    if (fixture === LOCAL_PROJECT && pristine.has(LOCAL_PROJECT)) return LOCAL_PROJECT;
     if (typeof fixture !== "string" || !isFixtureId(fixture) || !fixtureIds.includes(fixture)) {
-      throw new EngineError("INVALID_FIXTURE", "Choose one of the controlled fixtures.");
+      throw new EngineError("INVALID_FIXTURE", "Choose one of the controlled fixtures or load your own project.");
     }
     return fixture;
   }
 
-  function reset(fixture: FixtureId): FixtureState {
+  function loadLocal(input: unknown): { fixture: typeof LOCAL_PROJECT; files: number } {
+    const checked = validateLocalFiles(input);
+    if (!checked.ok) throw new EngineError("INVALID_PROJECT", checked.message);
+    pristine.set(LOCAL_PROJECT, copyFiles(checked.files));
+    states.delete(LOCAL_PROJECT);
+    return { fixture: LOCAL_PROJECT, files: checked.files.length };
+  }
+
+  function reset(fixture: SourceId): FixtureState {
     const files = copyFiles(pristine.get(fixture) ?? []);
     const state: FixtureState = { files, baseline: scanFiles(files), applied: [], patches: new Map() };
     states.set(fixture, state);
     return state;
   }
 
-  function current(fixture: FixtureId): { state: FixtureState; report: ScanResult } {
+  function current(fixture: SourceId): { state: FixtureState; report: ScanResult } {
     const state = states.get(fixture) ?? reset(fixture);
     return { state, report: scanFiles(state.files) };
   }
@@ -126,5 +146,9 @@ export function createEngine(bundle: FixtureBundle): Engine {
     throw new EngineError("NOT_FOUND", "Unknown action.");
   }
 
-  return { fixtures: () => [...fixtureIds], call };
+  return {
+    fixtures: () => (pristine.has(LOCAL_PROJECT) ? [...fixtureIds, LOCAL_PROJECT] : [...fixtureIds]),
+    loadLocal,
+    call,
+  };
 }

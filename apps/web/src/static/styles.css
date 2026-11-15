@@ -71,6 +71,15 @@ h3 { font-size: 1rem; margin: 0; }
 .fixture-button[aria-pressed="true"] { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 16%, transparent); box-shadow: inset 4px 0 var(--amber); }
 .fixture-button strong { display: block; }
 .fixture-button span { display: block; margin-top: .15rem; color: var(--muted); font-size: .84rem; }
+.local-project { display: grid; gap: .75rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.rail-heading { font-size: 1.15rem; margin-bottom: .45rem; }
+code { font: .88em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.paste-box summary { display: list-item; min-height: 44px; padding: .6rem 0; cursor: pointer; font-weight: 700; }
+.paste-box summary:hover { color: var(--amber); }
+.paste-body { display: grid; gap: .5rem; }
+.paste-label { color: var(--muted); font-size: .82rem; font-weight: 700; }
+textarea { width: 100%; min-height: 9rem; resize: vertical; border: 1px solid var(--line); border-radius: .25rem; background: var(--canvas); color: var(--text); padding: .6rem; font: .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.paste-box summary:focus-visible, textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .boundary-note { margin: auto 0 0; padding-top: 1rem; border-top: 1px solid var(--line); font-size: .82rem; }
 
 .panel-heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; padding-bottom: 1.1rem; border-bottom: 1px solid var(--line); }

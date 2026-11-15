@@ -14,7 +14,8 @@ function compare(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// Reads the project's own .kiro/ only. The root is fixed by the package location, never by user input.
+// Reads <projectRoot>/.kiro/ only: text files, no symlinks, bounded count and size. The web app never
+// calls this; the CLI passes either this repository's root or a directory its local user chose.
 export function loadProjectKiro(projectRoot: string = PROJECT_ROOT): Result<FixtureFile[], FixtureError> {
   const files: FixtureFile[] = [];
 
