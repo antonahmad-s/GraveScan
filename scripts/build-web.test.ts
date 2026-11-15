@@ -59,8 +59,15 @@ describe("static web build", () => {
     for (const id of listFixtures()) expect(index).toMatch(new RegExp(`data-fixture="${id}"[^>]*disabled`));
   });
 
+  it("keeps the page renderer out of HTML injection sinks", () => {
+    const source = readFileSync(path.join(root, "apps/web/src/static/app.js"), "utf8");
+    expect(source).not.toMatch(/\b(?:innerHTML|outerHTML|insertAdjacentHTML|document\.write)\b/);
+  });
+
   it("sends isolation and permission headers", () => {
     const headers = readFileSync(path.join(dist, "_headers"), "utf8");
+    expect(headers).toContain("require-trusted-types-for 'script'");
+    expect(headers).toContain("trusted-types gravescan");
     expect(headers).toContain("Cross-Origin-Opener-Policy: same-origin");
     expect(headers).toContain("Cross-Origin-Resource-Policy: same-origin");
     expect(headers).toContain("Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()");

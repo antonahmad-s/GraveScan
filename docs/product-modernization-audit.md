@@ -97,7 +97,9 @@ Do not add WebGL, scroll hijacking, decorative video, an AI chat panel, or a fak
 - [x] No upload endpoint, no server-side scan state, no database, and no third-party scripts.
 - [x] Engine outputs and CLI output redact known secret-like values before rendering, exporting, or logging.
 - [x] File count and byte limits are enforced before reading and again at the engine boundary.
-- [x] UI data is HTML-escaped before insertion.
+- [x] UI data is rendered with DOM nodes and `textContent`; the renderer has no HTML injection sink.
+- [x] Trusted Types requires `TrustedScriptURL` at the Worker URL sink and permits only the `gravescan` policy.
+- [x] A least-privilege GitHub workflow writes and uploads redacted SARIF for this repository's `.kiro/` changes.
 - [ ] Rule coverage has not been externally validated against a representative corpus of production Kiro projects.
 
 ### Performance
