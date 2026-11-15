@@ -82,6 +82,8 @@ Do not add WebGL, scroll hijacking, decorative video, an AI chat panel, or a fak
 
 ## 5. UI/UX Modernization Blueprint
 
+Spec 09 (2026-11-15) changed the accent from amber to the violet of the owner's logo, added a serif display face, and replaced the three columns with a case picker above a two-column board. The principles below still apply; `docs/design-decisions.md` has the current choices.
+
 - **Color system:** charcoal is the default evidence surface; paper remains a real alternate theme. Amber marks the active evidence trail, red only marks high and critical risk, and green only marks a verified outcome. The triage strip uses amber on its left edge to connect source selection to the findings queue.
 - **Typography:** use system sans-serif for labels, prose, and actions; reserve monospace for pasted configuration, evidence, and unified diffs. Headings are compact and task-led: “Choose a case”, “Static scan”, “Finding detail”.
 - **Layout and density:** desktop uses three functional regions, not equal marketing cards: source selection, queue, and case detail. A narrow viewport stacks the regions in scan order. The triage strip gives the current source and risk distribution before the detail view.

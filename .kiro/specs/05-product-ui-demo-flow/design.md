@@ -10,7 +10,7 @@ The PRD planned Next.js. The first build used a dependency-free Node 22 `http` s
 - **The engine is pure.** Scanning, replay, patch generation, apply, verification, and reporting all operate on `{ path, content }` arrays. Only fixture loading and the CLI's work copies touch the disk, and those stay in the Node entry points. Each package also has a `browser` entry with no Node built-ins, and esbuild bundles them into `dist/assets/engine.js` (about 87 KB minified).
 - **Isolation comes by construction.** Each tab creates its own engine, so there is no shared state to evict, leak, or exhaust. The low audit finding about an evicted session's copy being recreated on disk no longer has code to apply to.
 - **It is free and has no cold start.** An assets-only Worker runs no script, and static asset requests are free on the Workers Free plan. No database is needed. Supabase was rejected because free projects pause after a week without activity. Durable Objects and Containers were rejected as more moving parts, and Containers need a paid plan.
-- **Smaller attack surface.** There are no POST routes, cookies, request bodies, or server-side file paths. The page makes five GET requests, all for its own static files, and the Playwright suite fails if it makes any other request.
+- **Smaller attack surface.** There are no POST routes, cookies, request bodies, or server-side file paths. The page makes GET requests only for its own static files (the document, the fingerprinted assets, and since Spec 09 the icon set), and the Playwright suite fails if it makes any other request.
 
 ```mermaid
 flowchart LR
@@ -33,6 +33,8 @@ A public demo URL is shared by every judge, so one visitor's patch must not chan
 - State lives in the tab's memory and is gone on reload. Nothing is stored server side.
 
 ## Screen structure
+
+Spec 09 replaced this layout and added the owner's logo; see `.kiro/specs/09-editorial-workbench-and-icons/design.md`. The original structure was:
 
 - Header: text wordmark, current state, theme toggle. The text wordmark avoids inventing a logo asset.
 - Fixture rail: three named controlled fixtures and a reset action.
