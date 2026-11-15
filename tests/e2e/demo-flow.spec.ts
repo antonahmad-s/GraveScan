@@ -19,7 +19,7 @@ async function scanUnsafeMcp(page: Page): Promise<void> {
 test("demo flow: scan, replay, patch, verify, compare, export, reset", async ({ page }) => {
   const errors = collectConsoleErrors(page);
   await page.goto("/");
-  await expect(page.getByText("Select a fixture, then run a scan.")).toBeVisible();
+  await expect(page.getByText("Choose a case, then run a scan.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Run scan" })).toBeDisabled();
 
   await scanUnsafeMcp(page);
@@ -187,6 +187,23 @@ test("a chosen project folder is read locally, filtered to .kiro, and secrets ar
   expect(requests.every((url) => new URL(url).origin === new URL(baseURL ?? "").origin)).toBe(true);
 });
 
+test("a finding without a safe patch reports the reason next to the action", async ({ page }, testInfo) => {
+  const root = testInfo.outputPath("agent-repo");
+  mkdirSync(path.join(root, ".kiro/agents"), { recursive: true });
+  writeFileSync(path.join(root, ".kiro/agents/researcher.json"), '{\n  "name": "researcher",\n  "tools": ["web"],\n  "prompt": "Research the topic."\n}\n');
+
+  await page.goto("/");
+  await page.locator("#folder-input").setInputFiles(root);
+  await expect(page.getByRole("status").first()).toContainText("Scan complete.");
+  await page.getByRole("button", { name: /GRAVE-007/ }).click();
+  await page.getByRole("button", { name: "Generate patch" }).click();
+  await expect(page.getByRole("status").first()).toContainText("A safe automatic patch is not available for this finding.");
+  await expect(page.locator("#finding-detail .inline-error")).toHaveText("A safe automatic patch is not available for this finding.");
+  // Choosing another finding clears the message that belonged to the previous one.
+  await page.getByRole("button", { name: /GRAVE-010/ }).click();
+  await expect(page.locator("#finding-detail .inline-error")).toHaveCount(0);
+});
+
 test("does not retain HTML from a hostile steering file as DOM", async ({ page }, testInfo) => {
     const root = testInfo.outputPath("hostile-repo");
     mkdirSync(path.join(root, ".kiro/steering"), { recursive: true });
@@ -217,6 +234,24 @@ test("the full flow only loads same-origin static files and sends strict headers
 
   if (baseURL === undefined) throw new Error("Playwright baseURL is required for this test.");
   const origin = new URL(baseURL).origin;
-  const allowed = new RegExp(`^GET ${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/$|/assets/(?:app|worker|fixtures|styles)\\.[a-f0-9]{12}\\.(?:js|json|css)$)`);
+  // The page's own files: the document, the fingerprinted assets, and the fixed-name icon set.
+  const icons = "favicon\\.ico|icon0\\.svg|icon1\\.png|apple-icon\\.png|manifest\\.json|web-app-manifest-(?:192x192|512x512)\\.png";
+  const allowed = new RegExp(`^GET ${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/$|/(?:${icons})$|/assets/(?:app|worker|fixtures|styles)\\.[a-f0-9]{12}\\.(?:js|json|css)$)`);
   expect(requests.filter((entry) => !allowed.test(entry))).toEqual([]);
+});
+
+test("the icon set and web app manifest are served with their own types and the same headers", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".brand img")).toHaveJSProperty("complete", true);
+  expect(await page.locator(".brand img").evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  const files: [string, string][] = [["/favicon.ico", "image/x-icon"], ["/icon0.svg", "image/svg+xml"], ["/icon1.png", "image/png"], ["/apple-icon.png", "image/png"], ["/web-app-manifest-192x192.png", "image/png"], ["/web-app-manifest-512x512.png", "image/png"]];
+  for (const [file, type] of files) {
+    const response = await page.request.get(file);
+    expect(response.status(), file).toBe(200);
+    expect(response.headers()["content-type"], file).toBe(type);
+    expect(response.headers()["x-content-type-options"], file).toBe("nosniff");
+  }
+  const manifest = await (await page.request.get("/manifest.json")).json();
+  expect(manifest.name).toBe("GraveScan");
+  for (const icon of manifest.icons) expect((await page.request.get(icon.src)).status(), icon.src).toBe(200);
 });

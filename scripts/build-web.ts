@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { build } from "esbuild";
 import { listFixtures, loadFixture, type FixtureFile } from "@gravescan/fixtures";
@@ -9,8 +9,10 @@ import { listFixtures, loadFixture, type FixtureFile } from "@gravescan/fixtures
 
 const root = path.resolve(import.meta.dirname, "..");
 const staticDir = path.join(root, "apps/web/src/static");
+const publicDir = path.join(root, "apps/web/public");
 const dist = path.join(root, "dist");
 const assets = path.join(dist, "assets");
+const BUILD_OUTPUTS = new Set(["index.html", "_headers", "assets"]);
 
 export const CONTENT_SECURITY_POLICY =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types gravescan";
@@ -46,6 +48,19 @@ function writeAsset(stem: string, extension: string, content: Uint8Array | strin
   const file = `${stem}.${fingerprint(content)}${extension}`;
   writeFileSync(path.join(assets, file), content);
   return `/assets/${file}`;
+}
+
+// Favicons and the web app manifest keep fixed root URLs, because browsers and the manifest ask
+// for them by name. They are revalidated like index.html instead of cached immutably.
+export function copyPublicFiles(from: string, to: string): string[] {
+  const copied: string[] = [];
+  for (const entry of readdirSync(from, { withFileTypes: true })) {
+    if (!entry.isFile() || entry.name.startsWith(".")) continue;
+    if (BUILD_OUTPUTS.has(entry.name)) throw new Error(`apps/web/public/${entry.name} would replace a build output.`);
+    copyFileSync(path.join(from, entry.name), path.join(to, entry.name));
+    copied.push(entry.name);
+  }
+  return copied.sort();
 }
 
 function replaceOnce(source: string, target: string, replacement: string): string {
@@ -88,6 +103,7 @@ export async function buildWeb(): Promise<void> {
   markup = replaceOnce(markup, 'href="/assets/styles.css"', `href="${stylesUrl}"`);
   markup = replaceOnce(markup, 'src="/assets/app.js"', `src="${appUrl}"`);
   markup = replaceOnce(markup, 'href="/assets/fixtures.json"', `href="${fixturesUrl}"`);
+  copyPublicFiles(publicDir, dist);
   writeFileSync(path.join(dist, "index.html"), markup);
   writeFileSync(path.join(dist, "_headers"), HEADERS);
 }
