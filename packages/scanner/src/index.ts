@@ -4,6 +4,8 @@ export { parseDocuments } from "./documents.ts";
 export type { ScanDocument } from "./documents.ts";
 export { remediationContractFindings, RULES } from "./rules.ts";
 export type { RuleDefinition } from "./rules.ts";
+export { environmentName, REDACTED, redactDeep, redactSecrets, secretAssignments } from "./secrets.ts";
+export type { SecretAssignment } from "./secrets.ts";
 export { scanFiles, scanFixture } from "./scan.ts";
 export {
   ConfidenceSchema,

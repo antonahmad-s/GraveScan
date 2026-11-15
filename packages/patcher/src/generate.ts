@@ -1,10 +1,9 @@
 import type { FixtureFile, Result } from "@gravescan/fixtures/browser";
-import { scanFiles, type Finding } from "@gravescan/scanner/browser";
+import { environmentName, scanFiles, secretAssignments, type Finding } from "@gravescan/scanner/browser";
 import type { Patch, PatchError } from "./schemas.ts";
 import { unifiedDiff } from "./diff.ts";
 
 const shellCapability = /(?:run[_-]?command|shell|terminal|(?:^|[_-])exec(?:ute)?(?:$|[_-])|bash|powershell|(?:^|[_-])cmd(?:$|[_-]))/i;
-const secretAssignment = /((?:["']?[a-z0-9_]*(?:token|secret|password|api_?key)[a-z0-9_]*["']?\s*[:=]\s*["']))([^"'\s]{6,})(["'])/i;
 
 function patchError(code: PatchError["code"], value: string): Result<Patch, PatchError> {
   if (code === "PATCH_UNSUPPORTED") return { ok: false, error: { code, ruleId: value } };
@@ -188,11 +187,18 @@ function transform(finding: Finding, before: string): { after: string; reason: s
         riskNote: "Workflows that require external files need a separately approved design.",
       };
     case "GRAVE-009": {
-      const after = before.replace(secretAssignment, "$1${API_TOKEN}$3");
-      return after === before ? undefined : {
+      // Patch the value on the finding's own line, and name the variable after its key.
+      let name = "";
+      const after = replaceLine(before, finding.line, (line) => {
+        const target = secretAssignments(line).find((item) => line[item.valueIndex + item.value.length] === item.quote);
+        if (target === undefined) return undefined;
+        name = environmentName(target.key);
+        return `${line.slice(0, target.valueIndex)}\${${name}}${line.slice(target.valueIndex + target.value.length)}`;
+      });
+      return after === undefined ? undefined : {
         after,
         reason: "Replaces a committed secret-like value with an environment reference.",
-        riskNote: "Set API_TOKEN only at runtime and never export it in reports.",
+        riskNote: `Set ${name} only at runtime, rotate the exposed value, and never export it in reports.`,
       };
     }
     default:
