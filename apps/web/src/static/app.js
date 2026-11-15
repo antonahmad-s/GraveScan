@@ -5,11 +5,15 @@ const FIXTURES_URL = "/assets/fixtures.json";
 const LOCAL_PROJECT = "local-project";
 const SEVERITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
 const fixturesRequest = fetch(FIXTURES_URL).then((response) => { if (!response.ok) throw new Error("fixtures"); return response.json(); });
-const worker = new Worker(WORKER_URL);
+// Worker source is a build-time constant. Trusted Types prevents any future dynamic string from
+// reaching this script URL sink, while the fallback keeps older browsers functional.
+const trustedScriptUrl = window.trustedTypes?.createPolicy("gravescan", { createScriptURL: (url) => url });
+const worker = new Worker(trustedScriptUrl ? trustedScriptUrl.createScriptURL(WORKER_URL) : WORKER_URL);
 const pending = new Map();
 let nextRequestId = 1;
 let sources = [];
 let engineReady = false;
+
 function send(type, body = {}) {
   return new Promise((resolve, reject) => {
     const id = nextRequestId++;
@@ -61,9 +65,29 @@ const sourceBoundary = $("#source-boundary");
 const scanSummary = $("#scan-summary");
 let localLabel = "";
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
+// DOM builders keep untrusted config text out of HTML parser sinks. The CSP can therefore require
+// Trusted Types without relying on manual escaping at every new render path.
+function node(tag, options = {}) {
+  const element = document.createElement(tag);
+  if (options.className) element.className = options.className;
+  if (options.id) element.id = options.id;
+  if (options.text !== undefined) element.textContent = String(options.text);
+  for (const [name, value] of Object.entries(options.attrs || {})) element.setAttribute(name, String(value));
+  return element;
 }
+function append(parent, ...children) {
+  for (const child of children.flat()) if (child !== undefined && child !== null && child !== false) parent.append(child);
+  return parent;
+}
+function text(tag, value, options = {}) { return node(tag, { ...options, text: value }); }
+function button(label, className, onClick, attrs = {}) {
+  const control = text("button", label, { className, attrs: { type: "button", ...attrs } });
+  control.addEventListener("click", onClick);
+  return control;
+}
+function section(children) { return append(node("section", { className: "detail-section" }), children); }
+function evidence(content, className = "evidence") { return append(node("pre", { className }), node("code", { text: content })); }
+
 function setStatus(message, kind = "") {
   statusLine.textContent = message;
   findingState.className = `state-panel ${kind}`.trim();
@@ -90,19 +114,25 @@ function renderSourceContext() {
   sourceBoundary.textContent = source.boundary;
 }
 function renderScanSummary() {
-  if (!state.report) { scanSummary.hidden = true; scanSummary.innerHTML = ""; return; }
+  scanSummary.replaceChildren();
+  if (!state.report) { scanSummary.hidden = true; return; }
   const counts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const finding of state.report.findings) counts[finding.severity] += 1;
   const entries = Object.entries(counts).filter(([, count]) => count > 0);
   const diagnostics = state.report.diagnostics.length;
+  const label = `${state.report.findings.length} finding${state.report.findings.length === 1 ? "" : "s"}${diagnostics === 0 ? "" : `, ${diagnostics} parse diagnostic${diagnostics === 1 ? "" : "s"}`}`;
+  const heading = append(node("div"), text("h3", "Current signal"), text("p", label));
+  const list = node("ul", { className: "severity-counts", attrs: { "aria-label": "Findings by severity" } });
+  if (entries.length === 0) append(list, append(node("li"), text("strong", "0"), text("span", "findings")));
+  for (const [severity, count] of entries) append(list, append(node("li", { className: severity }), text("strong", count), text("span", severity)));
+  append(scanSummary, heading, list);
   scanSummary.hidden = false;
-  scanSummary.innerHTML = `<div><h3>Current signal</h3><p>${state.report.findings.length} finding${state.report.findings.length === 1 ? "" : "s"}${diagnostics === 0 ? "" : `, ${diagnostics} parse diagnostic${diagnostics === 1 ? "" : "s"}`}</p></div><ul class="severity-counts" aria-label="Findings by severity">${entries.map(([severity, count]) => `<li class="${severity}"><strong>${count}</strong><span>${severity}</span></li>`).join("") || "<li><strong>0</strong><span>findings</span></li>"}</ul>`;
 }
 function selectedFinding() {
   return state.report?.findings.find((finding) => finding.id === state.selected) || state.lastFinding || null;
 }
 function severityClass(severity) { return severity === "critical" || severity === "high" ? severity : "medium"; }
-// Lists are rebuilt with innerHTML, so keep keyboard focus on the same item instead of dropping it to <body>.
+// Lists are rebuilt with DOM nodes, so keep keyboard focus on the same item instead of dropping it to <body>.
 function focusedKey(container, attribute) {
   const active = document.activeElement;
   return active && container.contains(active) ? active.getAttribute(attribute) : null;
@@ -114,8 +144,15 @@ function restoreFocus(container, attribute, key) {
 }
 function renderFixtures(fixtures) {
   const focused = focusedKey(fixtureList, "data-fixture");
-  fixtureList.innerHTML = fixtures.map((fixture) => `<button class="fixture-button" type="button" data-fixture="${escapeHtml(fixture)}" aria-pressed="${fixture === state.fixture}"><strong>${escapeHtml(fixtureNames[fixture] || fixture)}</strong><span>${escapeHtml(fixture === LOCAL_PROJECT ? localLabel : fixture)}</span></button>`).join("");
-  fixtureList.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => chooseFixture(button.dataset.fixture)));
+  fixtureList.replaceChildren();
+  for (const fixture of fixtures) {
+    const name = fixtureNames[fixture] || fixture;
+    const label = fixture === LOCAL_PROJECT ? localLabel : fixture;
+    const control = node("button", { className: "fixture-button", attrs: { type: "button", "data-fixture": fixture, "aria-pressed": fixture === state.fixture, ...(engineReady ? {} : { disabled: "" }) } });
+    append(control, text("strong", name), text("span", label));
+    control.addEventListener("click", () => chooseFixture(fixture));
+    append(fixtureList, control);
+  }
   restoreFocus(fixtureList, "data-fixture", focused);
 }
 function renderControls() {
@@ -139,48 +176,80 @@ function filteredFindings() {
 function renderRules() {
   const current = ruleFilter.value;
   const rules = [...new Set((state.report?.findings || []).map((finding) => finding.ruleId))];
-  ruleFilter.innerHTML = `<option value="all">All rules</option>${rules.map((rule) => `<option value="${escapeHtml(rule)}">${escapeHtml(rule)}</option>`).join("")}`;
+  ruleFilter.replaceChildren(node("option", { text: "All rules", attrs: { value: "all" } }));
+  for (const rule of rules) append(ruleFilter, node("option", { text: rule, attrs: { value: rule } }));
   ruleFilter.value = rules.includes(current) ? current : "all";
 }
 function renderFindings() {
   const focused = focusedKey(findingList, "data-finding");
-  findingList.innerHTML = "";
+  findingList.replaceChildren();
   if (!state.report) { findingState.hidden = false; findingState.textContent = "Select a fixture, then run a scan."; return; }
   const findings = filteredFindings();
   if (findings.length === 0) { findingState.hidden = false; findingState.textContent = "No findings match the selected filters."; return; }
   findingState.hidden = true;
-  findingList.innerHTML = findings.map((finding) => `<li><button class="finding-button" type="button" data-finding="${escapeHtml(finding.id)}" aria-current="${finding.id === state.selected}"><span class="severity ${severityClass(finding.severity)}">${escapeHtml(finding.severity)}</span><span><strong>${escapeHtml(finding.ruleId)}: ${escapeHtml(finding.title)}</strong><span class="finding-meta"><span>${escapeHtml(finding.file)}:${finding.line}</span><span>${finding.attackScenarioId ? "Replay available" : "Static evidence"}</span></span></span></button></li>`).join("");
-  findingList.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => { state.selected = button.dataset.finding; state.lastFinding = selectedFinding(); state.replay = null; state.patch = null; state.verification = null; renderFindings(); renderDetail(); }));
+  for (const finding of findings) {
+    const control = node("button", { className: "finding-button", attrs: { type: "button", "data-finding": finding.id, "aria-current": finding.id === state.selected } });
+    const severity = text("span", finding.severity, { className: `severity ${severityClass(finding.severity)}` });
+    const meta = append(node("span", { className: "finding-meta" }), text("span", `${finding.file}:${finding.line}`), text("span", finding.attackScenarioId ? "Replay available" : "Static evidence"));
+    append(control, severity, append(node("span"), text("strong", `${finding.ruleId}: ${finding.title}`), meta));
+    control.addEventListener("click", () => { state.selected = finding.id; state.lastFinding = selectedFinding(); state.replay = null; state.patch = null; state.verification = null; renderFindings(); renderDetail(); });
+    append(findingList, append(node("li"), control));
+  }
   restoreFocus(findingList, "data-finding", focused);
 }
-function diffMarkup(diff) {
-  return escapeHtml(diff).split("\n").map((line) => `<span class="${line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : line.startsWith("@") ? "header" : ""}">${line}</span>`).join("\n");
+function diffEvidence(diff) {
+  const code = node("code");
+  for (const line of diff.split("\n")) {
+    const className = line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : line.startsWith("@") ? "header" : "";
+    append(code, text("span", line, { className }), document.createTextNode("\n"));
+  }
+  return append(node("pre", { className: "evidence diff" }), code);
 }
 function comparisonList(label, findings) {
-  const items = findings.length === 0 ? "<li>None</li>" : findings.map((finding) => `<li>${escapeHtml(finding.ruleId)}: ${escapeHtml(finding.title)}</li>`).join("");
-  return `<div class="comparison-group"><h4>${label} (${findings.length})</h4><ul>${items}</ul></div>`;
+  const list = node("ul");
+  if (findings.length === 0) append(list, text("li", "None"));
+  for (const finding of findings) append(list, text("li", `${finding.ruleId}: ${finding.title}`));
+  return append(node("div", { className: "comparison-group" }), text("h4", `${label} (${findings.length})`), list);
 }
-function comparisonMarkup(comparison) {
-  if (!comparison) return "";
-  return `<div class="comparison" aria-label="Findings compared with the first scan">${comparisonList("Resolved since first scan", comparison.resolved)}${comparisonList("Introduced since first scan", comparison.introduced)}</div>`;
+function comparisonView(comparison) {
+  if (!comparison) return undefined;
+  return append(node("div", { className: "comparison", attrs: { "aria-label": "Findings compared with the first scan" } }), comparisonList("Resolved since first scan", comparison.resolved), comparisonList("Introduced since first scan", comparison.introduced));
 }
 function renderDetail() {
   const finding = selectedFinding();
-  detail.innerHTML = "";
+  detail.replaceChildren();
   if (!finding) { detailState.hidden = false; detailState.textContent = "Choose a finding to inspect its evidence trail."; return; }
   detailState.hidden = true;
   const replay = state.replay;
   const patch = state.patch;
   const verification = state.verification;
-  detail.innerHTML = `
-    <section class="detail-section"><span class="severity ${severityClass(finding.severity)}">${escapeHtml(finding.severity)}</span><h3>${escapeHtml(finding.ruleId)}: ${escapeHtml(finding.title)}</h3><p>${escapeHtml(finding.description)}</p><p class="muted">${escapeHtml(finding.file)}:${finding.line} · Confidence: ${escapeHtml(finding.confidence)}</p><pre class="evidence"><code>${escapeHtml(finding.evidence)}</code></pre></section>
-    <section class="detail-section"><h3>Recommended boundary</h3><p>${escapeHtml(finding.remediation)}</p><div class="detail-actions">${finding.attackScenarioId ? '<button id="replay-button" class="quiet-button" type="button">Run safe replay</button>' : ""}<button id="patch-button" class="primary-button" type="button">Generate patch</button></div></section>
-    ${replay ? `<section class="detail-section"><h3>${escapeHtml(replay.scenarioName)}</h3><p class="muted">Capability request: ${escapeHtml(replay.capabilityRequest)}. Policy decision: ${escapeHtml(replay.policyDecision)}. Result: ${escapeHtml(replay.result)}.</p><ol class="trace">${replay.steps.map((step) => `<li><strong>${escapeHtml(step.label)}</strong><span>${escapeHtml(step.detail)}</span></li>`).join("")}</ol><p class="boundary-note">${escapeHtml(replay.safetyNotice)}</p></section>` : ""}
-    ${patch ? `<section class="detail-section"><h3>Proposed patch</h3><p>${escapeHtml(patch.reason)}</p><p class="muted">Review note: ${escapeHtml(patch.riskNote)}</p><pre class="evidence diff"><code>${diffMarkup(patch.diff)}</code></pre><div class="detail-actions"><button id="apply-button" class="primary-button" type="button">Apply to isolated copy</button></div></section>` : ""}
-    ${verification ? `<section class="detail-section"><span class="verification-status ${verification.status === "Simulation blocked" || verification.status === "Verified" ? "success" : "review"}">${escapeHtml(verification.status)}</span><h3>Verification report</h3><p>Target finding present after patch: ${verification.targetFindingPresent ? "Yes" : "No"}. High/Critical findings: ${verification.highCriticalBefore} before, ${verification.highCriticalAfter} after.</p>${verification.replay ? `<p>Replay result after patch: ${escapeHtml(verification.replay.result)}.</p>` : ""}${comparisonMarkup(verification.comparison)}</section>` : ""}`;
-  $("#replay-button")?.addEventListener("click", runReplay);
-  $("#patch-button")?.addEventListener("click", generatePatch);
-  $("#apply-button")?.addEventListener("click", applyPatch);
+  append(detail,
+    section([
+      text("span", finding.severity, { className: `severity ${severityClass(finding.severity)}` }),
+      text("h3", `${finding.ruleId}: ${finding.title}`),
+      text("p", finding.description),
+      text("p", `${finding.file}:${finding.line} · Confidence: ${finding.confidence}`, { className: "muted" }),
+      evidence(finding.evidence),
+    ]),
+    section([
+      text("h3", "Recommended boundary"),
+      text("p", finding.remediation),
+      append(node("div", { className: "detail-actions" }), ...(finding.attackScenarioId ? [button("Run safe replay", "quiet-button", runReplay, { id: "replay-button" })] : []), button("Generate patch", "primary-button", generatePatch, { id: "patch-button" })),
+    ]),
+  );
+  if (replay) {
+    const trace = node("ol", { className: "trace" });
+    for (const step of replay.steps) append(trace, append(node("li"), text("strong", step.label), text("span", step.detail)));
+    append(detail, section([text("h3", replay.scenarioName), text("p", `Capability request: ${replay.capabilityRequest}. Policy decision: ${replay.policyDecision}. Result: ${replay.result}.`, { className: "muted" }), trace, text("p", replay.safetyNotice, { className: "boundary-note" })]));
+  }
+  if (patch) append(detail, section([text("h3", "Proposed patch"), text("p", patch.reason), text("p", `Review note: ${patch.riskNote}`, { className: "muted" }), diffEvidence(patch.diff), append(node("div", { className: "detail-actions" }), button("Apply to isolated copy", "primary-button", applyPatch, { id: "apply-button" }))]));
+  if (verification) append(detail, section([
+    text("span", verification.status, { className: `verification-status ${verification.status === "Simulation blocked" || verification.status === "Verified" ? "success" : "review"}` }),
+    text("h3", "Verification report"),
+    text("p", `Target finding present after patch: ${verification.targetFindingPresent ? "Yes" : "No"}. High/Critical findings: ${verification.highCriticalBefore} before, ${verification.highCriticalAfter} after.`),
+    verification.replay ? text("p", `Replay result after patch: ${verification.replay.result}.`) : undefined,
+    comparisonView(verification.comparison),
+  ]));
 }
 async function chooseFixture(fixture) {
   state.fixture = fixture; state.report = null; state.selected = null; state.lastFinding = null; state.replay = null; state.patch = null; state.verification = null;
@@ -275,4 +344,4 @@ try { setTheme(localStorage.getItem("gravescan-theme") || "dark"); } catch { set
 fixturesRequest
   .then((bundle) => send("init", { bundle }))
   .then((value) => { engineReady = true; sources = value.fixtures; renderSourceContext(); renderScanSummary(); renderFixtures(sources); renderControls(); })
-  .catch(() => { fixtureList.textContent = "Fixtures could not be loaded."; setStatus("Fixtures could not be loaded.", "error"); });
+  .catch(() => { fixtureList.replaceChildren(document.createTextNode("Fixtures could not be loaded.")); setStatus("Fixtures could not be loaded.", "error"); });

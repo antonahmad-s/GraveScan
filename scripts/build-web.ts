@@ -13,7 +13,7 @@ const dist = path.join(root, "dist");
 const assets = path.join(dist, "assets");
 
 export const CONTENT_SECURITY_POLICY =
-  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types gravescan";
 
 const HEADERS = `/*
   Content-Security-Policy: ${CONTENT_SECURITY_POLICY}
