@@ -15,7 +15,7 @@ The PRD planned Next.js. The first build used a dependency-free Node 22 `http` s
 ```mermaid
 flowchart LR
   B[Browser tab] -->|GET static files| CF[Cloudflare static assets]
-  B --> E["Engine (bundled in engine.js)"]
+  B --> E["Engine worker (worker.&lt;hash&gt;.js, see Spec 07)"]
   E --> F["fixtures.json, built from the trusted loader"]
   E --> S[Scanner]
   E --> R[Simulator]
@@ -58,7 +58,7 @@ Errors are `EngineError` values with a code and a user-facing message. The build
 
 ## Build and hosting
 
-- `pnpm build` (`scripts/build-web.ts`) writes `dist/`: `index.html`, `assets/app.js`, `assets/styles.css`, `assets/engine.js`, `assets/fixtures.json`, and `_headers`.
+- `pnpm build` (`scripts/build-web.ts`) writes `dist/`: `index.html`, content-hashed `assets/app.*.js`, `assets/styles.*.css`, `assets/worker.*.js`, `assets/fixtures.*.json`, and `_headers`.
 - `pnpm dev` and Playwright serve `dist/` with `scripts/serve-dist.ts`, which applies the same `_headers`.
 - `wrangler.jsonc` declares an assets-only Worker named `gravescan`. Workers Builds runs `pnpm build` and `npx wrangler deploy` on each push to `main`.
 

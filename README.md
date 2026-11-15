@@ -29,7 +29,7 @@ GraveScan also scans its own `.kiro/` directory (`pnpm self-scan`) in a Kiro hoo
 
 ## Stack
 
-TypeScript end to end: Zod, Vitest, fast-check, Playwright, ESLint, esbuild, and pnpm on Node 22. The web workbench is a static site. esbuild bundles the scanner, simulator, patcher, and reporting packages into one browser module, so every scan, replay, and patch runs in the visitor's own tab. Cloudflare Workers serves the files with no server code. The PRD planned Next.js; [Spec 05](.kiro/specs/05-product-ui-demo-flow/design.md) records why the project moved to a static browser build.
+TypeScript end to end: Zod, Vitest, fast-check, Playwright, ESLint, esbuild, and pnpm on Node 22. The web workbench is a static site. esbuild bundles the scanner, simulator, patcher, and reporting packages into one Web Worker, so every scan, replay, and patch runs in the visitor's own tab without blocking input. Cloudflare Workers serves the files with no server code. The PRD planned Next.js; [Spec 05](.kiro/specs/05-product-ui-demo-flow/design.md) records why the project moved to a static browser build.
 
 ## Quick start
 
@@ -53,10 +53,11 @@ pnpm gravescan list
 pnpm gravescan scan --fixture unsafe-mcp --format json
 pnpm gravescan scan --fixture unsafe-mcp --format json --fail-on high   # exits 1 on a High or Critical finding
 pnpm gravescan scan --path ../my-project --format json --fail-on high     # scans ../my-project/.kiro/
+pnpm gravescan scan --path ../my-project --format sarif > gravescan.sarif  # for GitHub code scanning
 pnpm gravescan self-scan --format json
 ```
 
-`--path` reads `<dir>/.kiro/` only and rejects symlinks. The CLI prints secret-like values as `[REDACTED]`, so its output is safe for CI logs.
+`--path` reads `<dir>/.kiro/` only and rejects symlinks. `--format sarif` writes SARIF 2.1.0; see [docs/github-code-scanning.md](docs/github-code-scanning.md) for a pull request workflow. The CLI prints secret-like values as `[REDACTED]`, so its output is safe for CI logs.
 
 ### End-to-end tests
 

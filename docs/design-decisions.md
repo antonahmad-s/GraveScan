@@ -15,3 +15,5 @@ Design Read: security workbench for developers and technical judges, forensic in
 - **No dashboard metrics:** the UI presents actual scanner output rather than unsupported security or performance claims.
 - **Triage context strip and severity counts:** the queue needs a source and a risk distribution before an expert opens individual findings; it uses real scan output rather than synthetic dashboard metrics.
 - **Content-hashed static assets:** JavaScript, CSS, and fixtures get a SHA-256-derived URL, so Cloudflare can cache them immutably without serving a stale engine after a deploy. HTML stays revalidated.
+- **Highest risk first:** the queue orders findings critical, high, medium, low and selects the top one after a scan. The engine keeps file and line order for reports and SARIF; ordering by risk is a presentation decision.
+- **Fixture buttons in the markup:** the three bundled cases are known at build time, so the list is rendered before any script runs and does not shift when the engine becomes ready.
