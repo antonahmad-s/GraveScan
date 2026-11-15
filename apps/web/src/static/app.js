@@ -1,3 +1,5 @@
+import { createEngine, EngineError } from "./engine.js";
+
 const state = { fixture: null, report: null, selected: null, lastFinding: null, replay: null, patch: null, verification: null, busy: false };
 const fixtureNames = {
   "unsafe-mcp": "Unsafe MCP",
@@ -31,11 +33,15 @@ function setBusy(busy, message) {
   if (message) setStatus(message);
   renderControls();
 }
+// The engine runs in this page, so every scan, replay, and patch stays in this visitor's browser.
+let engine = null;
 async function request(route, payload) {
-  const response = await fetch(route, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-  const value = await response.json();
-  if (!response.ok) throw new Error(value.error?.message || "The request could not be completed.");
-  return value;
+  if (!engine) throw new Error("The scanner is still loading.");
+  try {
+    return engine.call(route, payload);
+  } catch (error) {
+    throw new Error(error instanceof EngineError ? error.message : "The request could not be completed.");
+  }
 }
 function selectedFinding() {
   return state.report?.findings.find((finding) => finding.id === state.selected) || state.lastFinding || null;
@@ -169,4 +175,7 @@ exportButton.addEventListener("click", exportMarkdown);
 severityFilter.addEventListener("change", renderFindings);
 ruleFilter.addEventListener("change", renderFindings);
 try { setTheme(localStorage.getItem("gravescan-theme") || "dark"); } catch { setTheme("dark"); }
-fetch("/api/fixtures").then((response) => response.json()).then((value) => { renderFixtures(value.fixtures); renderControls(); }).catch(() => { fixtureList.textContent = "Fixtures could not be loaded."; setStatus("Fixtures could not be loaded.", "error"); });
+fetch("/assets/fixtures.json")
+  .then((response) => { if (!response.ok) throw new Error("fixtures"); return response.json(); })
+  .then((bundle) => { engine = createEngine(bundle); renderFixtures(engine.fixtures()); renderControls(); })
+  .catch(() => { fixtureList.textContent = "Fixtures could not be loaded."; setStatus("Fixtures could not be loaded.", "error"); });

@@ -1,2 +1,3 @@
 export const PACKAGE = "@gravescan/web" as const;
-export { createAppServer } from "./server.ts";
+export { createEngine, EngineError } from "./engine.ts";
+export type { Engine, FixtureBundle } from "./engine.ts";
