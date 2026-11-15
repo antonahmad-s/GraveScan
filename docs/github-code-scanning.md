@@ -54,5 +54,5 @@ To also fail the job on high findings, add `--fail-on high` and set `if: always(
 ## Limits
 
 - Code scanning is free for public repositories. Private repositories need GitHub Advanced Security.
-- The SARIF output is covered by unit tests for its structure, rule indexes, levels, locations, fingerprints, and redaction. It has not yet been uploaded to a live GitHub code scanning instance from this repository.
+- The SARIF output is covered by unit tests for its structure, rule indexes, levels, locations, fingerprints, and redaction. GraveScan's own `.github/workflows/gravescan.yml` uploads its self-scan SARIF on `.kiro/` changes and on manual dispatch. The first live upload still needs to complete successfully before treating this integration as verified.
 - GraveScan reads only `.kiro/` text files. It does not scan application source code.

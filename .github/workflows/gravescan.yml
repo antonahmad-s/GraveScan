@@ -1,0 +1,37 @@
+name: GraveScan code scanning
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".kiro/**"
+      - ".github/workflows/gravescan.yml"
+  pull_request:
+    paths:
+      - ".kiro/**"
+      - ".github/workflows/gravescan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan-kiro:
+    name: Upload GraveScan SARIF
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: corepack prepare pnpm@10.26.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Scan this repository's Kiro configuration
+        run: pnpm gravescan self-scan --format sarif > gravescan.sarif
+      - name: Upload Code Scanning results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gravescan.sarif
+          category: gravescan
