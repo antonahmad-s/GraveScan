@@ -6,5 +6,8 @@
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./dist"
-  }
+  },
+  // Required by `wrangler preview`, which Workers Builds runs for pull request branches.
+  // Empty on purpose: previews reuse the top-level assets and compatibility settings.
+  "previews": {}
 }

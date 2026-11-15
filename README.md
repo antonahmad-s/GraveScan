@@ -77,6 +77,7 @@ Automatic deploys from GitHub (Workers Builds):
 2. Set the Worker name to `gravescan`. It must match `name` in `wrangler.jsonc`.
 3. Build command: `pnpm build`. Deploy command: `npx wrangler deploy`. Root directory: `/`.
 4. Production branch: `main`. Each push to `main` then builds and deploys to `https://gravescan.<your-subdomain>.workers.dev`.
+5. Pull request branches run `npx wrangler preview` and get a separate preview URL. That command needs the `previews` block in `wrangler.jsonc`, which is empty on purpose.
 
 `dist/_headers` sets the Content Security Policy, `nosniff`, `Referrer-Policy`, and `X-Frame-Options` for every file. Each visitor's isolated copy lives in their own tab and is gone on reload, so concurrent judges do not affect each other. No login is required.
 
