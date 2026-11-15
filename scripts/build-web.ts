@@ -1,10 +1,11 @@
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { build } from "esbuild";
 import { listFixtures, loadFixture, type FixtureFile } from "@gravescan/fixtures";
 
-// Builds the static site that Cloudflare serves: HTML, CSS, the UI script, the bundled in-browser
-// engine, and the controlled fixtures as JSON. No server code is produced.
+// Builds the static site that Cloudflare serves. Content-hashed assets may be cached indefinitely:
+// each changed input gets a fresh URL, while index.html is revalidated on every visit.
 
 const root = path.resolve(import.meta.dirname, "..");
 const staticDir = path.join(root, "apps/web/src/static");
@@ -19,6 +20,9 @@ const HEADERS = `/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
 `;
 
 function fixtureBundle(): Record<string, FixtureFile[]> {
@@ -31,19 +35,30 @@ function fixtureBundle(): Record<string, FixtureFile[]> {
   return bundle;
 }
 
+function fingerprint(content: Uint8Array | string): string {
+  return createHash("sha256").update(content).digest("hex").slice(0, 12);
+}
+
+function writeAsset(stem: string, extension: string, content: Uint8Array | string): string {
+  const file = `${stem}.${fingerprint(content)}${extension}`;
+  writeFileSync(path.join(assets, file), content);
+  return `/assets/${file}`;
+}
+
+function replaceOnce(source: string, target: string, replacement: string): string {
+  const index = source.indexOf(target);
+  if (index === -1) throw new Error(`Expected build placeholder was not found: ${target}`);
+  return `${source.slice(0, index)}${replacement}${source.slice(index + target.length)}`;
+}
+
 export async function buildWeb(): Promise<void> {
   rmSync(dist, { recursive: true, force: true });
   mkdirSync(assets, { recursive: true });
 
-  copyFileSync(path.join(staticDir, "index.html"), path.join(dist, "index.html"));
-  copyFileSync(path.join(staticDir, "app.js"), path.join(assets, "app.js"));
-  copyFileSync(path.join(staticDir, "styles.css"), path.join(assets, "styles.css"));
-  writeFileSync(path.join(assets, "fixtures.json"), JSON.stringify(fixtureBundle()));
-  writeFileSync(path.join(dist, "_headers"), HEADERS);
-
-  await build({
+  const engine = await build({
     entryPoints: [path.join(root, "apps/web/src/engine.ts")],
     outfile: path.join(assets, "engine.js"),
+    write: false,
     bundle: true,
     format: "esm",
     platform: "browser",
@@ -53,6 +68,23 @@ export async function buildWeb(): Promise<void> {
     legalComments: "none",
     logLevel: "warning",
   });
+  const engineOutput = engine.outputFiles?.find((file) => file.path.endsWith("engine.js"));
+  if (engineOutput === undefined) throw new Error("esbuild did not return the browser engine.");
+
+  const engineUrl = writeAsset("engine", ".js", engineOutput.contents);
+  const fixturesUrl = writeAsset("fixtures", ".json", JSON.stringify(fixtureBundle()));
+  const stylesUrl = writeAsset("styles", ".css", readFileSync(path.join(staticDir, "styles.css")));
+
+  let app = readFileSync(path.join(staticDir, "app.js"), "utf8");
+  app = replaceOnce(app, '"./engine.js"', `"./${path.basename(engineUrl)}"`);
+  app = replaceOnce(app, '"/assets/fixtures.json"', `"${fixturesUrl}"`);
+  const appUrl = writeAsset("app", ".js", app);
+
+  let markup = readFileSync(path.join(staticDir, "index.html"), "utf8");
+  markup = replaceOnce(markup, 'href="/assets/styles.css"', `href="${stylesUrl}"`);
+  markup = replaceOnce(markup, 'src="/assets/app.js"', `src="${appUrl}"`);
+  writeFileSync(path.join(dist, "index.html"), markup);
+  writeFileSync(path.join(dist, "_headers"), HEADERS);
 }
 
 if (process.argv[1] === import.meta.filename) {

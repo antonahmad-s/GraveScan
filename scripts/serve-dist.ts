@@ -2,8 +2,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 
-// Local stand-in for Cloudflare static assets: serves files from dist/ with the headers in
-// dist/_headers. GET and HEAD only, no directory listings, nothing outside dist/.
+// Local stand-in for Cloudflare static assets: GET and HEAD only, no directory listings, nothing
+// outside dist/. It applies the wildcard and prefix rules written to dist/_headers.
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -12,30 +12,56 @@ const TYPES: Record<string, string> = {
   ".json": "application/json; charset=utf-8",
 };
 
-// Supports the subset of the _headers format the build writes: a "/*" block of "Name: value" lines.
-export function parseHeaders(text: string): Record<string, string> {
-  const headers: Record<string, string> = {};
-  let active = false;
+export type HeaderRule = { readonly pattern: string; readonly headers: Record<string, string> };
+
+export function parseHeaderRules(text: string): HeaderRule[] {
+  const rules: HeaderRule[] = [];
+  let pattern: string | undefined;
+  let headers: Record<string, string> = {};
+  const finish = () => {
+    if (pattern !== undefined) rules.push({ pattern, headers });
+  };
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     if (!/^\s/.test(line)) {
-      active = line.trim() === "/*";
+      finish();
+      pattern = line.trim();
+      headers = {};
       continue;
     }
     const separator = line.indexOf(":");
-    if (active && separator > 0) headers[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+    if (pattern !== undefined && separator > 0) headers[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
   }
+  finish();
+  return rules;
+}
+
+function matches(pattern: string, pathname: string): boolean {
+  if (pattern === "/*") return true;
+  if (pattern.endsWith("/*")) return pathname.startsWith(pattern.slice(0, -1));
+  return pathname === pattern;
+}
+
+export function headersFor(rules: readonly HeaderRule[], pathname: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const rule of rules) if (matches(rule.pattern, pathname)) Object.assign(headers, rule.headers);
   return headers;
+}
+
+// Kept for callers that only need the catch-all headers from the original helper.
+export function parseHeaders(text: string): Record<string, string> {
+  return headersFor(parseHeaderRules(text), "/");
 }
 
 export function createStaticServer(dist: string): Server {
   const root = path.resolve(dist);
   const headersFile = path.join(root, "_headers");
-  const shared = existsSync(headersFile) ? parseHeaders(readFileSync(headersFile, "utf8")) : {};
+  const rules = existsSync(headersFile) ? parseHeaderRules(readFileSync(headersFile, "utf8")) : [];
 
   return createServer((request, response) => {
-    const send = (status: number, type: string, body: string | Buffer) => {
-      response.writeHead(status, { ...shared, "Content-Type": type, "Cache-Control": "no-store" });
+    const send = (status: number, type: string, body: string | Buffer, pathname = "/") => {
+      const headers = headersFor(rules, pathname);
+      response.writeHead(status, { ...headers, "Content-Type": type, "Cache-Control": headers["Cache-Control"] ?? "no-store" });
       response.end(request.method === "HEAD" ? undefined : body);
     };
     if (request.method !== "GET" && request.method !== "HEAD") return send(405, "text/plain; charset=utf-8", "Method not allowed");
@@ -51,9 +77,9 @@ export function createStaticServer(dist: string): Server {
     const type = TYPES[path.extname(file)];
     const inside = file.startsWith(root + path.sep) && !relative.split("/").some((part) => part.startsWith("."));
     if (!inside || type === undefined || path.basename(file) === "_headers" || !existsSync(file) || !statSync(file).isFile()) {
-      return send(404, "text/plain; charset=utf-8", "Not found");
+      return send(404, "text/plain; charset=utf-8", "Not found", pathname);
     }
-    send(200, type, readFileSync(file));
+    send(200, type, readFileSync(file), pathname);
   });
 }
 
