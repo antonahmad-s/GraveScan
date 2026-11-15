@@ -1,5 +1,6 @@
+import path from "node:path";
 import { listFixtures, loadProjectKiro } from "@gravescan/fixtures";
-import { scanFiles, scanFixture, type ScanResult, type Severity } from "@gravescan/scanner";
+import { redactDeep, scanFiles, scanFixture, type ScanResult, type Severity } from "@gravescan/scanner";
 
 export type Io = {
   readonly out: (line: string) => void;
@@ -12,22 +13,24 @@ export const USAGE = [
   "Commands:",
   "  list                                         Print available fixture IDs",
   "  scan --fixture <id> --format json            Scan one controlled fixture",
+  "  scan --path <dir> --format json              Scan the .kiro/ folder of a project directory",
   "  self-scan --format json [--fail-on <level>]  Scan this project's own .kiro/ directory",
   "  help                                         Show this message",
   "",
   "--fail-on exits 1 when a finding at or above <level> exists (critical, high, medium, low).",
+  "Secret-like values are printed as [REDACTED]. Files are read only; nothing is executed or changed.",
 ].join("\n");
 
 const SEVERITY_RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3, critical: 4 };
 
-type Options = { fixture?: string; format?: string; failOn?: string };
+type Options = { fixture?: string; path?: string; format?: string; failOn?: string };
 
 function parseOptions(args: readonly string[], allowed: readonly (keyof Options)[]): Options | string {
-  const flags: Record<string, keyof Options> = { "--fixture": "fixture", "--format": "format", "--fail-on": "failOn" };
+  const flags: Record<string, keyof Options> = { "--fixture": "fixture", "--path": "path", "--format": "format", "--fail-on": "failOn" };
   const options: Options = {};
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index] ?? "";
-    const key = flags[flag];
+    const key = Object.hasOwn(flags, flag) ? flags[flag] : undefined;
     const value = args[index + 1];
     if (key === undefined || !allowed.includes(key) || value === undefined || options[key] !== undefined) {
       return `Unsupported option: ${JSON.stringify(flag)}`;
@@ -35,7 +38,7 @@ function parseOptions(args: readonly string[], allowed: readonly (keyof Options)
     options[key] = value;
   }
   if (options.format !== "json") return "Only --format json is supported.";
-  if (options.failOn !== undefined && !(options.failOn in SEVERITY_RANK)) {
+  if (options.failOn !== undefined && !Object.hasOwn(SEVERITY_RANK, options.failOn)) {
     return "--fail-on must be one of: critical, high, medium, low.";
   }
   return options;
@@ -48,7 +51,7 @@ function usageError(io: Io, message: string): number {
 }
 
 function report(io: Io, result: ScanResult, failOn: string | undefined): number {
-  io.out(JSON.stringify(result, null, 2));
+  io.out(JSON.stringify(redactDeep(result), null, 2));
   if (failOn === undefined) return 0;
   const threshold = SEVERITY_RANK[failOn as Severity];
   const blocking = result.findings.filter((finding) => SEVERITY_RANK[finding.severity] >= threshold);
@@ -57,11 +60,26 @@ function report(io: Io, result: ScanResult, failOn: string | undefined): number 
   return 1;
 }
 
+function scanPath(io: Io, directory: string, failOn: string | undefined): number {
+  const root = path.resolve(directory);
+  const files = loadProjectKiro(root);
+  if (!files.ok) {
+    const error = files.error;
+    const where = "path" in error ? ` (${error.path})` : "";
+    io.err(`${error.code}${"reason" in error ? `: ${error.reason}` : ""}${where}. Expected a readable .kiro/ folder inside ${root}.`);
+    return 1;
+  }
+  return report(io, scanFiles(files.value), failOn);
+}
+
 function runScan(args: readonly string[], io: Io): number {
-  const options = parseOptions(args, ["fixture", "format", "failOn"]);
+  const options = parseOptions(args, ["fixture", "path", "format", "failOn"]);
   if (typeof options === "string") return usageError(io, options);
-  if (options.fixture === undefined) return usageError(io, "Missing required option: --fixture <id>");
-  const result = scanFixture(options.fixture);
+  if ((options.fixture === undefined) === (options.path === undefined)) {
+    return usageError(io, "Use exactly one of --fixture <id> or --path <dir>.");
+  }
+  if (options.path !== undefined) return scanPath(io, options.path, options.failOn);
+  const result = scanFixture(options.fixture as string);
   if (!result.ok) {
     io.err(`${result.error.code}: ${JSON.stringify(result.error)}`);
     return 1;

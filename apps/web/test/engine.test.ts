@@ -108,6 +108,47 @@ describe("GraveScan browser engine", () => {
     expect(errorCode(() => api("/api/not-real", { fixture: "unsafe-mcp" }))).toBe("NOT_FOUND");
   });
 
+  it("redacts secret-like values in findings, diffs, and reports", () => {
+    const api = client();
+    const scan = api("/api/scan", { fixture: "unsafe-mcp" });
+    const secret = scan.report.findings.find((item: Finding) => item.ruleId === "GRAVE-009");
+    expect(secret.evidence).toBe('        "API_TOKEN": "[REDACTED]"');
+    const patch = api("/api/patch/generate", { fixture: "unsafe-mcp", findingId: secret.id });
+    expect(patch.patch.diff).toContain('-        "API_TOKEN": "[REDACTED]"');
+    expect(patch.patch.diff).toContain('+        "API_TOKEN": "${API_TOKEN}"');
+    expect(JSON.stringify(patch)).not.toContain("GRAVESCAN_CANARY");
+    expect(api("/api/patch/apply", { fixture: "unsafe-mcp", patchId: patch.patch.id }).verification.status).toBe("Verified");
+    expect(api("/api/report", { fixture: "unsafe-mcp" }).markdown).not.toContain("GRAVESCAN_CANARY");
+  });
+
+  it("scans, replays, and patches a visitor's own files as the local project", () => {
+    const engine = createEngine(bundle());
+    const api = client(engine);
+    const mcp = '{\n  "mcpServers": {\n    "tools": {\n      "command": "node",\n      "autoApprove": ["run_command"],\n      "tools": ["run_command"]\n    }\n  }\n}\n';
+    expect(engine.loadLocal([{ path: ".kiro/settings/mcp.json", content: mcp }])).toEqual({ fixture: "local-project", files: 1 });
+    expect(engine.fixtures()).toContain("local-project");
+
+    const scan = api("/api/scan", { fixture: "local-project" });
+    const finding = scan.report.findings.find((item: Finding) => item.ruleId === "GRAVE-001");
+    expect(api("/api/replay", { fixture: "local-project", scenarioId: "MCP-TOOL-ESCALATION" }).replay.result).toBe("exposed");
+    const patch = api("/api/patch/generate", { fixture: "local-project", findingId: finding.id });
+    expect(api("/api/patch/apply", { fixture: "local-project", patchId: patch.patch.id }).verification.status).toBe("Simulation blocked");
+    expect(api("/api/report", { fixture: "local-project" }).filename).toBe("gravescan-local-project.md");
+
+    // Loading new files replaces the old project and its patches.
+    engine.loadLocal([{ path: ".kiro/steering/rules.md", content: "# Rules\n" }]);
+    expect(errorCode(() => api("/api/patch/apply", { fixture: "local-project", patchId: patch.patch.id }))).toBe("PATCH_NOT_FOUND");
+    expect(api("/api/scan", { fixture: "local-project" }).report.findings.map((item: Finding) => item.ruleId)).toEqual(["GRAVE-010"]);
+  });
+
+  it("refuses the local project before files are loaded and rejects invalid files", () => {
+    const engine = createEngine(bundle());
+    expect(errorCode(() => engine.call("/api/scan", { fixture: "local-project" }))).toBe("INVALID_FIXTURE");
+    expect(errorCode(() => engine.loadLocal([{ path: "../escape.json", content: "{}" }]))).toBe("INVALID_PROJECT");
+    expect(errorCode(() => engine.loadLocal("not files"))).toBe("INVALID_PROJECT");
+    expect(engine.fixtures()).not.toContain("local-project");
+  });
+
   it("only serves fixtures that are both known and present in the bundle", () => {
     const partial = { "unsafe-mcp": bundle()["unsafe-mcp"] } as unknown as FixtureBundle;
     const engine = createEngine(partial);

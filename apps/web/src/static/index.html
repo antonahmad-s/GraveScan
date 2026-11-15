@@ -12,7 +12,7 @@
       <div class="wordmark" aria-label="GraveScan"><span>GRAVE</span>SCAN</div>
       <p class="topbar-context">Security evidence workbench</p>
       <div class="topbar-actions">
-        <span id="status-line" role="status" aria-live="polite">Choose a controlled fixture to begin.</span>
+        <span id="status-line" role="status" aria-live="polite">Choose a fixture or your own project to begin.</span>
         <button id="theme-toggle" class="quiet-button" type="button" aria-label="Switch to light theme">Light theme</button>
       </div>
     </header>
@@ -22,9 +22,27 @@
         <div>
           <p class="section-label">Controlled fixtures</p>
           <h1 id="fixture-heading">Choose a case</h1>
-          <p class="muted">These files are intentionally vulnerable test data. No upload or live repository access is available.</p>
+          <p class="muted">These files are intentionally vulnerable test data with fake tokens.</p>
         </div>
         <div id="fixture-list" class="fixture-list" aria-label="Available fixture repositories"></div>
+        <section class="local-project" aria-labelledby="local-heading">
+          <div>
+            <p class="section-label">Your project</p>
+            <h2 id="local-heading" class="rail-heading">Scan your own .kiro</h2>
+            <p class="muted">Files are read in this tab and never uploaded. Only text files inside <code>.kiro/</code> are scanned, and secret-like values show as [REDACTED].</p>
+          </div>
+          <button id="folder-button" class="quiet-button full-width" type="button" disabled>Choose project folder</button>
+          <input id="folder-input" type="file" webkitdirectory multiple hidden>
+          <details class="paste-box">
+            <summary>Or paste an mcp.json</summary>
+            <div class="paste-body">
+              <label class="paste-label" for="paste-input">mcp.json content</label>
+              <textarea id="paste-input" rows="7" spellcheck="false" autocomplete="off"></textarea>
+              <button id="paste-button" class="quiet-button full-width" type="button" disabled>Scan pasted mcp.json</button>
+            </div>
+          </details>
+          <p id="local-summary" class="muted" hidden></p>
+        </section>
         <button id="reset-button" class="quiet-button full-width" type="button" disabled>Reset isolated copy</button>
         <p class="boundary-note">Safe simulation. No arbitrary code or network request was executed.</p>
       </aside>

@@ -6,6 +6,7 @@ import {
   lineWith,
   type ScanDocument,
 } from "./documents.ts";
+import { secretAssignments } from "./secrets.ts";
 
 export type RuleDefinition = {
   readonly id: RuleId;
@@ -51,7 +52,6 @@ const approvedHookCommand = /^pnpm (?:lint|typecheck|test|verify|self-scan|docs:
 const unsafeHookInput = /\$(?:SAVED_FILE(?:_PATH)?|INPUT)|\{\{\s*input\s*\}\}/i;
 const secretRequest = /\b(?:print|export|send|reveal)\b[^\n]{0,100}\b(?:secret|credential|environment variable|env(?:ironment)?\s+variable)/i;
 const broadFilesystemGrant = /(?:\byou may\b[^\n]{0,100}\b(?:any path|outside the workspace|outside workspace)|\bany path on the machine\b|\baccess outside the workspace\b)/i;
-const secretAssignment = /(?:["']?[a-z0-9_]*(?:token|secret|password|api_?key)[a-z0-9_]*["']?\s*[:=]\s*["'])([^"'\s]{6,})/i;
 const sandboxPolicyHeading = /^#{1,6}\s*sandbox policy\b/im;
 const explicitDenial = /\b(?:never|do not|don't|must not|forbidden|dilarang)\b/i;
 
@@ -61,10 +61,7 @@ function riskyLine(document: ScanDocument, expression: RegExp): { line: number; 
 }
 
 function concreteSecretAssignment(document: ScanDocument): { line: number; evidence: string } | undefined {
-  const index = document.lines.findIndex((line) => {
-    const value = secretAssignment.exec(line)?.[1];
-    return value !== undefined && !/^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/.test(value);
-  });
+  const index = document.lines.findIndex((line) => secretAssignments(line).length > 0);
   return index === -1 ? undefined : { line: index + 1, evidence: document.lines[index] ?? "(empty file)" };
 }
 

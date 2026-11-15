@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 function collectConsoleErrors(page: Page): string[] {
@@ -131,6 +133,53 @@ test("one visitor's patch does not change another visitor's copy", async ({ brow
 
   await aliceContext.close();
   await bobContext.close();
+});
+
+const unsafeMcp = '{\n  "mcpServers": {\n    "shell": {\n      "command": "node",\n      "autoApprove": ["run_command"],\n      "tools": ["run_command"]\n    }\n  }\n}\n';
+
+test("a pasted mcp.json is scanned, replayed, patched, and verified in the tab", async ({ page }) => {
+  const errors = collectConsoleErrors(page);
+  await page.goto("/");
+  await page.getByText("Or paste an mcp.json").click();
+  await page.getByRole("button", { name: "Scan pasted mcp.json" }).click();
+  await expect(page.getByRole("status").first()).toContainText("Paste the contents of an mcp.json file first.");
+  await expect(page.getByLabel("mcp.json content")).toBeFocused();
+
+  await page.getByLabel("mcp.json content").fill(unsafeMcp);
+  await page.getByRole("button", { name: "Scan pasted mcp.json" }).click();
+  await expect(page.getByRole("status").first()).toContainText("Scan complete.");
+  await expect(page.getByRole("button", { name: /Your project/ })).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: /GRAVE-001/ }).click();
+  await page.getByRole("button", { name: "Run safe replay" }).click();
+  await expect(page.getByText("Capability exposure reproduced safely.")).toBeVisible();
+  await page.getByRole("button", { name: "Generate patch" }).click();
+  await page.getByRole("button", { name: "Apply to isolated copy" }).click();
+  await expect(page.getByText("Simulation blocked", { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a chosen project folder is read locally, filtered to .kiro, and secrets are redacted", async ({ page, baseURL }, testInfo) => {
+  const root = testInfo.outputPath("my-repo");
+  mkdirSync(path.join(root, ".kiro/settings"), { recursive: true });
+  mkdirSync(path.join(root, "src"), { recursive: true });
+  const secret = `real-${"looking"}-value-123456`;
+  writeFileSync(path.join(root, ".kiro/settings/mcp.json"), `{\n  "mcpServers": {\n    "api": {\n      "command": "node",\n      "tools": ["search"],\n      "env": { "API_KEY": "${secret}" }\n    }\n  }\n}\n`);
+  writeFileSync(path.join(root, "src/app.json"), `{ "API_KEY": "${secret}" }`);
+
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("/");
+  await page.locator("#folder-input").setInputFiles(root);
+  await expect(page.getByRole("status").first()).toContainText("Scan complete.");
+  await expect(page.locator("#local-summary")).toContainText("1 file loaded from .kiro/.");
+
+  await page.getByRole("button", { name: /GRAVE-009/ }).click();
+  await expect(page.locator(".evidence").first()).toContainText('"API_KEY": "[REDACTED]"');
+  await page.getByRole("button", { name: "Generate patch" }).click();
+  await expect(page.locator(".diff")).toContainText('"${API_KEY}"');
+  expect(await page.content()).not.toContain(secret);
+  expect(requests.every((url) => new URL(url).origin === new URL(baseURL ?? "").origin)).toBe(true);
 });
 
 test("the full flow only loads same-origin static files and sends strict headers", async ({ page, baseURL }) => {
