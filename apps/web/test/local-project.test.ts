@@ -56,6 +56,7 @@ describe("validateLocalFiles", () => {
     ["non-string content", [{ path: ".kiro/a.json", content: 1 }]],
     ["a duplicate path", [{ path: ".kiro/a.json", content: "" }, { path: ".kiro/a.json", content: "" }]],
     ["an oversized file", [{ path: ".kiro/a.json", content: "x".repeat(LOCAL_LIMITS.maxFileBytes + 1) }]],
+    ["a UTF-8 file larger than its character count", [{ path: ".kiro/a.json", content: "é".repeat(Math.floor(LOCAL_LIMITS.maxFileBytes / 2) + 1) }]],
   ])("rejects %s", (_, input) => {
     expect(validateLocalFiles(input).ok).toBe(false);
   });

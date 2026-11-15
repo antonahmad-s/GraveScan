@@ -23,6 +23,8 @@ test("demo flow: scan, replay, patch, verify, compare, export, reset", async ({ 
   await expect(page.getByRole("button", { name: "Run scan" })).toBeDisabled();
 
   await scanUnsafeMcp(page);
+  await expect(page.getByLabel("Findings by severity")).toContainText(/3\s*high/);
+  await expect(page.getByLabel("Findings by severity")).toContainText(/1\s*medium/);
   await page.getByRole("button", { name: /GRAVE-001/ }).click();
   await expect(page.locator(".evidence").first()).toContainText("autoApprove");
 
@@ -196,6 +198,8 @@ test("the full flow only loads same-origin static files and sends strict headers
   await page.getByRole("button", { name: "Apply to isolated copy" }).click();
   await expect(page.getByText("Simulation blocked", { exact: true })).toBeVisible();
 
-  const allowed = ["/", "/assets/styles.css", "/assets/app.js", "/assets/engine.js", "/assets/fixtures.json"].map((route) => `GET ${new URL(route, baseURL).href}`);
-  expect(requests.filter((entry) => !allowed.includes(entry))).toEqual([]);
+  if (baseURL === undefined) throw new Error("Playwright baseURL is required for this test.");
+  const origin = new URL(baseURL).origin;
+  const allowed = new RegExp(`^GET ${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/$|/assets/(?:app|engine|fixtures|styles)\\.[a-f0-9]{12}\\.(?:js|json|css)$)`);
+  expect(requests.filter((entry) => !allowed.test(entry))).toEqual([]);
 });

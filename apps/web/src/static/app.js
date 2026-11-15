@@ -25,6 +25,9 @@ const folderInput = $("#folder-input");
 const pasteInput = $("#paste-input");
 const pasteButton = $("#paste-button");
 const localSummary = $("#local-summary");
+const sourceName = $("#source-name");
+const sourceBoundary = $("#source-boundary");
+const scanSummary = $("#scan-summary");
 let localLabel = "";
 
 function escapeHtml(value) {
@@ -49,6 +52,25 @@ async function request(route, payload) {
   } catch (error) {
     throw new Error(error instanceof EngineError ? error.message : "The request could not be completed.");
   }
+}
+function sourceDetails() {
+  if (state.fixture === LOCAL_PROJECT) return { name: "Your project", boundary: "Local .kiro files in this tab. No upload." };
+  if (state.fixture) return { name: fixtureNames[state.fixture] || state.fixture, boundary: "Controlled demo data with fake tokens." };
+  return { name: "Choose a case", boundary: "Browser-local analysis. No upload." };
+}
+function renderSourceContext() {
+  const source = sourceDetails();
+  sourceName.textContent = source.name;
+  sourceBoundary.textContent = source.boundary;
+}
+function renderScanSummary() {
+  if (!state.report) { scanSummary.hidden = true; scanSummary.innerHTML = ""; return; }
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const finding of state.report.findings) counts[finding.severity] += 1;
+  const entries = Object.entries(counts).filter(([, count]) => count > 0);
+  const diagnostics = state.report.diagnostics.length;
+  scanSummary.hidden = false;
+  scanSummary.innerHTML = `<div><h3>Current signal</h3><p>${state.report.findings.length} finding${state.report.findings.length === 1 ? "" : "s"}${diagnostics === 0 ? "" : `, ${diagnostics} parse diagnostic${diagnostics === 1 ? "" : "s"}`}</p></div><ul class="severity-counts" aria-label="Findings by severity">${entries.map(([severity, count]) => `<li class="${severity}"><strong>${count}</strong><span>${severity}</span></li>`).join("") || "<li><strong>0</strong><span>findings</span></li>"}</ul>`;
 }
 function selectedFinding() {
   return state.report?.findings.find((finding) => finding.id === state.selected) || state.lastFinding || null;
@@ -132,11 +154,11 @@ function renderDetail() {
 }
 async function chooseFixture(fixture) {
   state.fixture = fixture; state.report = null; state.selected = null; state.lastFinding = null; state.replay = null; state.patch = null; state.verification = null;
-  setStatus(`${fixtureNames[fixture]} selected. Run a scan when ready.`); renderFixtures(engine.fixtures()); renderControls(); renderFindings(); renderDetail();
+  setStatus(`${fixtureNames[fixture]} selected. Run a scan when ready.`); renderSourceContext(); renderScanSummary(); renderFixtures(engine.fixtures()); renderControls(); renderFindings(); renderDetail();
 }
 async function runScan(reset = false) {
   if (!state.fixture) return;
-  try { setBusy(true, reset ? "Resetting the isolated copy and scanning it." : "Scanning the controlled fixture."); const value = await request(reset ? "/api/reset" : "/api/scan", { fixture: state.fixture }); state.report = value.report; state.selected = value.report.findings[0]?.id || null; state.lastFinding = value.report.findings[0] || null; state.replay = null; state.patch = null; state.verification = null; renderRules(); setStatus(`Scan complete. ${value.report.findings.length} evidence-based findings are available.`, "success"); }
+  try { setBusy(true, reset ? "Resetting the isolated copy and scanning it." : "Scanning the controlled fixture."); const value = await request(reset ? "/api/reset" : "/api/scan", { fixture: state.fixture }); state.report = value.report; state.selected = value.report.findings[0]?.id || null; state.lastFinding = value.report.findings[0] || null; state.replay = null; state.patch = null; state.verification = null; renderRules(); renderScanSummary(); setStatus(`Scan complete. ${value.report.findings.length} evidence-based findings are available.`, "success"); }
   catch (error) { setStatus(error.message, "error"); }
   finally { setBusy(false); renderFindings(); renderDetail(); }
 }
@@ -154,7 +176,7 @@ async function generatePatch() {
 }
 async function applyPatch() {
   if (!state.patch || !state.fixture) return;
-  try { setBusy(true, "Applying the patch to the isolated copy and verifying it."); const value = await request("/api/patch/apply", { fixture: state.fixture, patchId: state.patch.id }); state.report = value.report; state.verification = { ...value.verification, comparison: value.comparison }; state.replay = value.verification.replay || null; renderRules(); setStatus(`Verification complete: ${value.verification.status}.`, value.verification.status === "Needs review" || value.verification.status === "Regression detected" ? "error" : "success"); }
+  try { setBusy(true, "Applying the patch to the isolated copy and verifying it."); const value = await request("/api/patch/apply", { fixture: state.fixture, patchId: state.patch.id }); state.report = value.report; state.verification = { ...value.verification, comparison: value.comparison }; state.replay = value.verification.replay || null; renderRules(); renderScanSummary(); setStatus(`Verification complete: ${value.verification.status}.`, value.verification.status === "Needs review" || value.verification.status === "Regression detected" ? "error" : "success"); }
   catch (error) { setStatus(error.message, "error"); }
   finally { setBusy(false); renderFindings(); renderDetail(); }
 }
@@ -227,5 +249,5 @@ ruleFilter.addEventListener("change", renderFindings);
 try { setTheme(localStorage.getItem("gravescan-theme") || "dark"); } catch { setTheme("dark"); }
 fetch("/assets/fixtures.json")
   .then((response) => { if (!response.ok) throw new Error("fixtures"); return response.json(); })
-  .then((bundle) => { engine = createEngine(bundle); renderFixtures(engine.fixtures()); renderControls(); })
+  .then((bundle) => { engine = createEngine(bundle); renderSourceContext(); renderScanSummary(); renderFixtures(engine.fixtures()); renderControls(); })
   .catch(() => { fixtureList.textContent = "Fixtures could not be loaded."; setStatus("Fixtures could not be loaded.", "error"); });
