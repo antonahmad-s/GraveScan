@@ -29,6 +29,7 @@ Record at least one concrete case where a spec, hook, or property test caught a 
 
 - 2026-11-13. A tablet-width test caught keyboard focus dropping to `<body>` after Enter on a finding. `renderFindings()` cleared the list before recording which item had focus. Fixed by recording focus first and restoring it after the rebuild; the Playwright keyboard test now asserts it.
 - 2026-11-13. A before/after comparison test caught that resolving GRAVE-001 also reported GRAVE-009 as resolved. The patch reformatted `mcp.json`, moving the canary token from line 7 to line 6, and finding IDs include the line. Patch verification had the same flaw: a patch that only moved a risky line would have counted as a fix. Both now match findings by rule, file, and evidence text. A test proves a move-only patch is `Needs review`.
+- 2026-11-13. Moving the web engine into the browser for free Cloudflare hosting: writing the engine's mutation test showed that `reset` copied files from the caller's fixture bundle on every call, so any later edit to that bundle would change each new reset. The engine now snapshots the pristine files once at creation, and the test edits the bundle after load to prove it.
 
 ## Vibe vs spec comparison
 - _TODO: pick one module, note time, rework, and bugs under each approach._

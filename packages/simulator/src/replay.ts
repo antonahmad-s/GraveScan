@@ -1,4 +1,4 @@
-import type { ScanResult } from "@gravescan/scanner";
+import type { ScanResult } from "@gravescan/scanner/browser";
 import { getScenario } from "./scenarios.ts";
 import type { ReplayEvidence, ReplayResult, SimulatorError } from "./schemas.ts";
 

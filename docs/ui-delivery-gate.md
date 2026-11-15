@@ -15,7 +15,7 @@ Antislop mode: during. Last run 2026-11-13 with `pnpm test:e2e` (Playwright 1.62
 - **R-33:** All UI changes were written in source. No rewrite scripts.
 - **R-34:** E2E toggles light and dark; screenshots of the verification panel were reviewed in both themes.
 - **R-35:** Click-through recorded by the e2e suite above, with zero browser console errors asserted.
-- **R-40:** No images, media, or third-party scripts. CSP allows same-origin scripts and styles only.
+- **R-40:** No images, media, or third-party scripts. `dist/_headers` sets a CSP that allows same-origin scripts, styles, and requests only. E2E runs against the built static site and fails on any request other than the page's own five static files.
 
 ## Purpose and liveliness
 

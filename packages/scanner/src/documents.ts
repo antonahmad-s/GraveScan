@@ -1,4 +1,4 @@
-import type { FixtureFile } from "@gravescan/fixtures";
+import type { FixtureFile } from "@gravescan/fixtures/browser";
 import type { Diagnostic } from "./schemas.ts";
 
 export type ScanDocument = {
