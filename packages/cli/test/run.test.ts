@@ -100,6 +100,32 @@ describe("run", () => {
     expect(capture(["scan", "--fixture", "unsafe-mcp", "--path", ".", "--format", "json"]).err[0]).toBe("Use exactly one of --fixture <id> or --path <dir>.");
   });
 
+  it("writes redacted SARIF for a project path and still honors --fail-on", () => {
+    const root = makeTempDir();
+    try {
+      mkdirSync(path.join(root, ".kiro/settings"), { recursive: true });
+      writeFileSync(path.join(root, ".kiro/settings/mcp.json"), '{\n  "mcpServers": {\n    "x": { "command": "node", "tools": ["a"], "env": { "API_KEY": "real-looking-value-123" } }\n  }\n}\n');
+      const result = capture(["scan", "--path", root, "--format", "sarif", "--fail-on", "high"]);
+      expect(result.code).toBe(1);
+      const log = JSON.parse(result.out[0] ?? "{}");
+      expect(log.version).toBe("2.1.0");
+      expect(log.runs[0].results.map((item: { ruleId: string }) => item.ruleId)).toContain("GRAVE-009");
+      expect(result.out[0]).not.toContain("real-looking-value-123");
+    } finally {
+      removeDir(root);
+    }
+  });
+
+  it("writes an empty SARIF run for this repository's self-scan", () => {
+    const result = capture(["self-scan", "--format", "sarif", "--fail-on", "medium"]);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.out[0] ?? "{}").runs[0].results).toEqual([]);
+  });
+
+  it("rejects unknown formats", () => {
+    expect(capture(["scan", "--fixture", "unsafe-mcp", "--format", "xml"]).err[0]).toBe("--format must be json or sarif.");
+  });
+
   it("rejects prototype keys as option names and levels", () => {
     expect(capture(["scan", "--fixture", "unsafe-mcp", "--format", "json", "--fail-on", "constructor"]).code).toBe(1);
     expect(capture(["scan", "constructor", "x", "--format", "json"]).code).toBe(1);

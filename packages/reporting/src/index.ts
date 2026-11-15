@@ -134,3 +134,5 @@ export function buildMarkdownReport(input: ReportInput): string {
 
   return `${lines.join("\n").trimEnd()}\n`;
 }
+
+export { buildSarif, SARIF_SCHEMA, TOOL_URI } from "./sarif.ts";

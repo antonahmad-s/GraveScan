@@ -86,6 +86,9 @@ importers:
       '@gravescan/fixtures':
         specifier: workspace:*
         version: link:../fixtures
+      '@gravescan/reporting':
+        specifier: workspace:*
+        version: link:../reporting
       '@gravescan/scanner':
         specifier: workspace:*
         version: link:../scanner

@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@gravescan/fixtures": "workspace:*",
+    "@gravescan/reporting": "workspace:*",
     "@gravescan/scanner": "workspace:*"
   }
 }
