@@ -58,6 +58,15 @@ Do not add WebGL, scroll hijacking, decorative video, an AI chat panel, or a fak
 4. Enforce browser-local byte limits using UTF-8 bytes, not JavaScript character count.
 5. Add build, cache, security, unit, and browser-flow verification.
 
+### Done in Spec 07
+
+1. Engine moved to a dedicated Web Worker; main-thread long tasks on a 500-file project dropped from 296 to 309 ms (4x CPU) to none over 50 ms.
+2. Findings ordered by risk, highest selected after a scan.
+3. Fixture bundle preloaded; fixture buttons rendered in static markup; cold-load CLS 0.0175 to 0.0000 in the lab.
+4. One scan per engine action instead of up to three.
+5. `--format sarif` for GitHub code scanning; see `docs/github-code-scanning.md`.
+6. COOP, CORP, and Permissions-Policy headers.
+
 ### Next, highest ROI
 
 1. Add a safe “copy remediation command” or patch instruction that never includes a raw secret value.

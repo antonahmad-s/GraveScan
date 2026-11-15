@@ -1,5 +1,5 @@
 import type { FixtureFile, Result } from "@gravescan/fixtures/browser";
-import { environmentName, scanFiles, secretAssignments, type Finding } from "@gravescan/scanner/browser";
+import { environmentName, scanFiles, secretAssignments, type Finding, type ScanResult } from "@gravescan/scanner/browser";
 import type { Patch, PatchError } from "./schemas.ts";
 import { unifiedDiff } from "./diff.ts";
 
@@ -13,9 +13,6 @@ function patchError(code: PatchError["code"], value: string): Result<Patch, Patc
   return { ok: false, error: { code, detail: value } };
 }
 
-function highCriticalCount(files: readonly FixtureFile[]): number {
-  return scanFiles(files).findings.filter((finding) => finding.severity === "high" || finding.severity === "critical").length;
-}
 
 function findFile(files: readonly FixtureFile[], file: string): string | undefined {
   return files.find((candidate) => candidate.path === file)?.content;
@@ -206,14 +203,19 @@ function transform(finding: Finding, before: string): { after: string; reason: s
   }
 }
 
+/**
+ * `baseline` must be the scan of `files`. Callers that already hold it pass it in, so a patch
+ * costs no extra full scan; otherwise it is computed once here.
+ */
 export function generatePatchForFiles(
   files: readonly FixtureFile[],
   finding: Finding,
+  baseline: ScanResult = scanFiles(files),
 ): Result<Patch, PatchError> {
-  const baselineHighCritical = highCriticalCount(files);
+  const baselineHighCritical = baseline.findings.filter((item) => item.severity === "high" || item.severity === "critical").length;
   const baselineRuleCount = Math.max(
     1,
-    scanFiles(files).findings.filter((item) => item.ruleId === finding.ruleId && item.file === finding.file).length,
+    baseline.findings.filter((item) => item.ruleId === finding.ruleId && item.file === finding.file).length,
   );
   const identity = { findingFile: finding.file, baselineRuleCount };
 

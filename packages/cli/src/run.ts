@@ -1,5 +1,6 @@
 import path from "node:path";
 import { listFixtures, loadProjectKiro } from "@gravescan/fixtures";
+import { buildSarif } from "@gravescan/reporting";
 import { redactDeep, scanFiles, scanFixture, type ScanResult, type Severity } from "@gravescan/scanner";
 
 export type Io = {
@@ -12,11 +13,12 @@ export const USAGE = [
   "",
   "Commands:",
   "  list                                         Print available fixture IDs",
-  "  scan --fixture <id> --format json            Scan one controlled fixture",
-  "  scan --path <dir> --format json              Scan the .kiro/ folder of a project directory",
-  "  self-scan --format json [--fail-on <level>]  Scan this project's own .kiro/ directory",
+  "  scan --fixture <id> --format <fmt>           Scan one controlled fixture",
+  "  scan --path <dir> --format <fmt>             Scan the .kiro/ folder of a project directory",
+  "  self-scan --format <fmt> [--fail-on <level>] Scan this project's own .kiro/ directory",
   "  help                                         Show this message",
   "",
+  "<fmt> is json, or sarif for GitHub code scanning and other SARIF tools.",
   "--fail-on exits 1 when a finding at or above <level> exists (critical, high, medium, low).",
   "Secret-like values are printed as [REDACTED]. Files are read only; nothing is executed or changed.",
 ].join("\n");
@@ -37,7 +39,7 @@ function parseOptions(args: readonly string[], allowed: readonly (keyof Options)
     }
     options[key] = value;
   }
-  if (options.format !== "json") return "Only --format json is supported.";
+  if (options.format !== "json" && options.format !== "sarif") return "--format must be json or sarif.";
   if (options.failOn !== undefined && !Object.hasOwn(SEVERITY_RANK, options.failOn)) {
     return "--fail-on must be one of: critical, high, medium, low.";
   }
@@ -50,8 +52,11 @@ function usageError(io: Io, message: string): number {
   return 1;
 }
 
-function report(io: Io, result: ScanResult, failOn: string | undefined): number {
-  io.out(JSON.stringify(redactDeep(result), null, 2));
+function report(io: Io, result: ScanResult, options: Options): number {
+  const failOn = options.failOn;
+  // Redact first: the SARIF fingerprint and snippet are then derived from redacted evidence too.
+  const redacted = redactDeep(result);
+  io.out(JSON.stringify(options.format === "sarif" ? buildSarif(redacted) : redacted, null, 2));
   if (failOn === undefined) return 0;
   const threshold = SEVERITY_RANK[failOn as Severity];
   const blocking = result.findings.filter((finding) => SEVERITY_RANK[finding.severity] >= threshold);
@@ -60,7 +65,7 @@ function report(io: Io, result: ScanResult, failOn: string | undefined): number 
   return 1;
 }
 
-function scanPath(io: Io, directory: string, failOn: string | undefined): number {
+function scanPath(io: Io, directory: string, options: Options): number {
   const root = path.resolve(directory);
   const files = loadProjectKiro(root);
   if (!files.ok) {
@@ -69,7 +74,7 @@ function scanPath(io: Io, directory: string, failOn: string | undefined): number
     io.err(`${error.code}${"reason" in error ? `: ${error.reason}` : ""}${where}. Expected a readable .kiro/ folder inside ${root}.`);
     return 1;
   }
-  return report(io, scanFiles(files.value), failOn);
+  return report(io, scanFiles(files.value), options);
 }
 
 function runScan(args: readonly string[], io: Io): number {
@@ -78,13 +83,13 @@ function runScan(args: readonly string[], io: Io): number {
   if ((options.fixture === undefined) === (options.path === undefined)) {
     return usageError(io, "Use exactly one of --fixture <id> or --path <dir>.");
   }
-  if (options.path !== undefined) return scanPath(io, options.path, options.failOn);
+  if (options.path !== undefined) return scanPath(io, options.path, options);
   const result = scanFixture(options.fixture as string);
   if (!result.ok) {
     io.err(`${result.error.code}: ${JSON.stringify(result.error)}`);
     return 1;
   }
-  return report(io, result.value, options.failOn);
+  return report(io, result.value, options);
 }
 
 function runSelfScan(args: readonly string[], io: Io): number {
@@ -95,7 +100,7 @@ function runSelfScan(args: readonly string[], io: Io): number {
     io.err(`${files.error.code}: ${JSON.stringify(files.error)}`);
     return 1;
   }
-  return report(io, scanFiles(files.value), options.failOn);
+  return report(io, scanFiles(files.value), options);
 }
 
 export function run(argv: readonly string[], io: Io): number {

@@ -1,4 +1,35 @@
-import { createEngine, EngineError, LOCAL_PROJECT, planLocalImport } from "./engine.js";
+// The engine runs in a dedicated worker, so scanning a large project never blocks input here.
+// The build replaces both asset paths below with content-hashed URLs.
+const WORKER_URL = "/assets/engine-worker.js";
+const FIXTURES_URL = "/assets/fixtures.json";
+const LOCAL_PROJECT = "local-project";
+const SEVERITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
+const fixturesRequest = fetch(FIXTURES_URL).then((response) => { if (!response.ok) throw new Error("fixtures"); return response.json(); });
+const worker = new Worker(WORKER_URL);
+const pending = new Map();
+let nextRequestId = 1;
+let sources = [];
+let engineReady = false;
+function send(type, body = {}) {
+  return new Promise((resolve, reject) => {
+    const id = nextRequestId++;
+    pending.set(id, { resolve, reject });
+    worker.postMessage({ id, type, ...body });
+  });
+}
+worker.addEventListener("message", (event) => {
+  const reply = event.data;
+  const waiter = pending.get(reply?.id);
+  if (!waiter) return;
+  pending.delete(reply.id);
+  if (reply.ok) waiter.resolve(reply.value);
+  else waiter.reject(new Error(reply.message));
+});
+worker.addEventListener("error", (event) => {
+  event.preventDefault();
+  for (const waiter of pending.values()) waiter.reject(new Error("The scanner stopped unexpectedly. Reload the page to try again."));
+  pending.clear();
+});
 
 const state = { fixture: null, report: null, selected: null, lastFinding: null, replay: null, patch: null, verification: null, busy: false };
 const fixtureNames = {
@@ -43,15 +74,10 @@ function setBusy(busy, message) {
   if (message) setStatus(message);
   renderControls();
 }
-// The engine runs in this page, so every scan, replay, and patch stays in this visitor's browser.
-let engine = null;
+// Every scan, replay, and patch runs in this visitor's own worker and never leaves the tab.
 async function request(route, payload) {
-  if (!engine) throw new Error("The scanner is still loading.");
-  try {
-    return engine.call(route, payload);
-  } catch (error) {
-    throw new Error(error instanceof EngineError ? error.message : "The request could not be completed.");
-  }
+  if (!engineReady) throw new Error("The scanner is still loading.");
+  return send("call", { route, payload });
 }
 function sourceDetails() {
   if (state.fixture === LOCAL_PROJECT) return { name: "Your project", boundary: "Local .kiro files in this tab. No upload." };
@@ -99,12 +125,16 @@ function renderControls() {
   exportButton.disabled = !state.report || state.busy;
   severityFilter.disabled = !state.report || state.busy;
   ruleFilter.disabled = !state.report || state.busy;
-  folderButton.disabled = !engine || state.busy;
-  pasteButton.disabled = !engine || state.busy;
+  folderButton.disabled = !engineReady || state.busy;
+  pasteButton.disabled = !engineReady || state.busy;
+}
+// Highest risk first; the engine's file and line order breaks ties, so the list stays stable.
+function byRisk(findings) {
+  return findings.map((finding, index) => ({ finding, index })).sort((a, b) => (SEVERITY_RANK[a.finding.severity] - SEVERITY_RANK[b.finding.severity]) || (a.index - b.index)).map((item) => item.finding);
 }
 function filteredFindings() {
   if (!state.report) return [];
-  return state.report.findings.filter((finding) => (severityFilter.value === "all" || finding.severity === severityFilter.value) && (ruleFilter.value === "all" || finding.ruleId === ruleFilter.value));
+  return byRisk(state.report.findings).filter((finding) => (severityFilter.value === "all" || finding.severity === severityFilter.value) && (ruleFilter.value === "all" || finding.ruleId === ruleFilter.value));
 }
 function renderRules() {
   const current = ruleFilter.value;
@@ -154,11 +184,11 @@ function renderDetail() {
 }
 async function chooseFixture(fixture) {
   state.fixture = fixture; state.report = null; state.selected = null; state.lastFinding = null; state.replay = null; state.patch = null; state.verification = null;
-  setStatus(`${fixtureNames[fixture]} selected. Run a scan when ready.`); renderSourceContext(); renderScanSummary(); renderFixtures(engine.fixtures()); renderControls(); renderFindings(); renderDetail();
+  setStatus(`${fixtureNames[fixture]} selected. Run a scan when ready.`); renderSourceContext(); renderScanSummary(); renderFixtures(sources); renderControls(); renderFindings(); renderDetail();
 }
 async function runScan(reset = false) {
   if (!state.fixture) return;
-  try { setBusy(true, reset ? "Resetting the isolated copy and scanning it." : "Scanning the controlled fixture."); const value = await request(reset ? "/api/reset" : "/api/scan", { fixture: state.fixture }); state.report = value.report; state.selected = value.report.findings[0]?.id || null; state.lastFinding = value.report.findings[0] || null; state.replay = null; state.patch = null; state.verification = null; renderRules(); renderScanSummary(); setStatus(`Scan complete. ${value.report.findings.length} evidence-based findings are available.`, "success"); }
+  try { setBusy(true, reset ? "Resetting the isolated copy and scanning it." : "Scanning the controlled fixture."); const value = await request(reset ? "/api/reset" : "/api/scan", { fixture: state.fixture }); state.report = value.report; const first = byRisk(value.report.findings)[0]; state.selected = first?.id || null; state.lastFinding = first || null; state.replay = null; state.patch = null; state.verification = null; renderRules(); renderScanSummary(); setStatus(`Scan complete. ${value.report.findings.length} evidence-based findings are available.`, "success"); }
   catch (error) { setStatus(error.message, "error"); }
   finally { setBusy(false); renderFindings(); renderDetail(); }
 }
@@ -191,16 +221,17 @@ async function exportMarkdown() {
   } catch (error) { setStatus(error.message, "error"); }
   finally { setBusy(false); }
 }
-// The visitor's own files: read here, validated again by the engine, and never sent anywhere.
-async function loadLocalProject(files, label) {
+// The visitor's own files: read and validated in the worker, and never sent anywhere.
+async function loadLocalProject(type, body, label) {
   setBusy(true, "Reading your .kiro files in this tab.");
   try {
-    const value = engine.loadLocal(files);
-    localLabel = label;
+    const value = await send(type, body);
+    sources = value.fixtures;
+    localLabel = typeof label === "function" ? label(value) : label;
     localSummary.hidden = false;
     localSummary.textContent = `${value.files} file${value.files === 1 ? "" : "s"} loaded from .kiro/. Reload the page to clear them.`;
   } catch (error) {
-    setStatus(error instanceof EngineError ? error.message : "Your files could not be loaded.", "error");
+    setStatus(error.message || "Your files could not be loaded.", "error");
     return;
   } finally {
     setBusy(false);
@@ -209,25 +240,19 @@ async function loadLocalProject(files, label) {
   await runScan(false);
 }
 async function loadChosenFolder() {
-  const files = [...folderInput.files];
+  // File handles are passed to the worker, which picks the .kiro text files and reads them there.
+  const entries = [...folderInput.files].map((file) => ({ path: file.webkitRelativePath || file.name, file }));
   folderInput.value = "";
-  if (files.length === 0) return;
-  const plan = planLocalImport(files.map((file) => ({ path: file.webkitRelativePath || file.name, size: file.size })));
-  if (!plan.ok) { setStatus(plan.message, "error"); return; }
-  let contents;
-  try {
-    contents = await Promise.all(plan.accepted.map(async (item) => ({ path: item.path, content: await files[item.index].text() })));
-  } catch {
-    setStatus("Your files could not be read.", "error");
-    return;
-  }
-  const skipped = plan.tooLarge.length === 0 ? "" : `, ${plan.tooLarge.length} skipped as larger than 1 MB`;
-  await loadLocalProject(contents, `${contents.length} .kiro file${contents.length === 1 ? "" : "s"}${skipped}`);
+  if (entries.length === 0) return;
+  await loadLocalProject("loadFolder", { entries }, (value) => {
+    const skipped = value.tooLarge === 0 ? "" : `, ${value.tooLarge} skipped as larger than 1 MB`;
+    return `${value.files} .kiro file${value.files === 1 ? "" : "s"}${skipped}`;
+  });
 }
 async function loadPastedConfig() {
   const content = pasteInput.value;
   if (content.trim() === "") { setStatus("Paste the contents of an mcp.json file first.", "error"); pasteInput.focus(); return; }
-  await loadLocalProject([{ path: ".kiro/settings/mcp.json", content }], "Pasted mcp.json");
+  await loadLocalProject("loadFiles", { files: [{ path: ".kiro/settings/mcp.json", content }] }, "Pasted mcp.json");
 }
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -247,7 +272,7 @@ pasteButton.addEventListener("click", loadPastedConfig);
 severityFilter.addEventListener("change", renderFindings);
 ruleFilter.addEventListener("change", renderFindings);
 try { setTheme(localStorage.getItem("gravescan-theme") || "dark"); } catch { setTheme("dark"); }
-fetch("/assets/fixtures.json")
-  .then((response) => { if (!response.ok) throw new Error("fixtures"); return response.json(); })
-  .then((bundle) => { engine = createEngine(bundle); renderSourceContext(); renderScanSummary(); renderFixtures(engine.fixtures()); renderControls(); })
+fixturesRequest
+  .then((bundle) => send("init", { bundle }))
+  .then((value) => { engineReady = true; sources = value.fixtures; renderSourceContext(); renderScanSummary(); renderFixtures(sources); renderControls(); })
   .catch(() => { fixtureList.textContent = "Fixtures could not be loaded."; setStatus("Fixtures could not be loaded.", "error"); });

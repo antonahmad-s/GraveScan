@@ -12,7 +12,9 @@ GraveScan itself is a target, especially as a public demo.
 | Patch modifies originals | The web engine patches an in-memory copy in the visitor's tab; the CLI patches a copy under `.gravescan-work/` |
 | One visitor changes another visitor's results | No server state. Each tab runs its own engine with its own copies, patches, and baselines (unit and Playwright tests) |
 | Resource exhaustion from many visitors | The host serves static files only; scans run on each visitor's own CPU and memory |
-| Script injection in the UI | All rendered values are HTML-escaped; `dist/_headers` sets a Content Security Policy that allows same-origin scripts, styles, and requests only, plus `nosniff` and `X-Frame-Options: DENY` |
+| Script injection in the UI | All rendered values are HTML-escaped; `dist/_headers` sets a Content Security Policy that allows same-origin scripts, styles, and requests only, plus `nosniff` and `X-Frame-Options: DENY`. The engine runs in a dedicated worker with no DOM access. Rendering still uses escaped `innerHTML`; Trusted Types is not yet enforced. |
+| Cross-origin windows or embeds reach the page | `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin`, and a `Permissions-Policy` that turns off camera, microphone, geolocation, payment, and USB |
+| Error details leak internals | The worker returns only engine error messages; any other exception becomes "The request could not be completed." (unit tested) |
 | Secret leakage in reports | Reports are built from redacted engine output. Redaction reduces accidental exposure but cannot prove recognition of every secret format; exported reports must still be treated as sensitive. |
 | False sense of security | UI and README never claim "secure"; show verification status |
 | Patch hides risk by deleting or moving findings | Success requires the rule's count in the file to drop AND replay `blocked`; a move-only patch is `Needs review` |
