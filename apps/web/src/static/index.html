@@ -3,108 +3,150 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>GraveScan: Security evidence workbench</title>
+    <title>GraveScan: Security evidence workbench for Kiro agent projects</title>
+    <meta name="description" content="Scan the .kiro configuration of a Kiro project with ten deterministic rules, replay the risk in a safe simulation, and verify the patch. Everything runs in your browser tab.">
+    <meta name="theme-color" content="#0d0c13">
+    <link rel="canonical" href="https://gravescan.antonahmadsusilo.workers.dev/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="GraveScan: Security evidence workbench">
+    <meta property="og:description" content="Scan a .kiro configuration, replay the risk in a safe simulation, and verify the patch in your browser.">
+    <meta property="og:url" content="https://gravescan.antonahmadsusilo.workers.dev/">
+    <meta property="og:image" content="https://gravescan.antonahmadsusilo.workers.dev/web-app-manifest-512x512.png">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
+    <link rel="icon" href="/icon0.svg" type="image/svg+xml">
+    <link rel="icon" href="/icon1.png" type="image/png" sizes="96x96">
+    <link rel="apple-touch-icon" href="/apple-icon.png" sizes="180x180">
+    <meta name="apple-mobile-web-app-title" content="GraveScan">
+    <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/assets/styles.css">
     <link rel="preload" href="/assets/fixtures.json" as="fetch" crossorigin="anonymous">
   </head>
   <body>
     <a class="skip-link" href="#workbench">Skip to workspace</a>
     <header class="topbar">
-      <div class="wordmark" aria-label="GraveScan"><span>GRAVE</span>SCAN</div>
-      <p class="topbar-context">Security evidence workbench</p>
-      <div class="topbar-actions">
-        <span id="status-line" role="status" aria-live="polite">Choose a fixture or your own project to begin.</span>
-        <button id="theme-toggle" class="quiet-button" type="button" aria-label="Switch to light theme">Light theme</button>
+      <div class="shell topbar-inner">
+        <p class="brand"><img src="/icon0.svg" width="30" height="30" alt=""><span>GraveScan</span></p>
+        <p class="topbar-context">Security evidence workbench</p>
+        <p id="status-line" class="status-line" role="status" aria-live="polite">Loading the scanner in this tab.</p>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5z" fill="currentColor"/></svg>
+          <span class="theme-label">Light theme</span>
+        </button>
       </div>
     </header>
 
-    <main id="workbench" class="workbench" aria-busy="false">
-      <aside class="fixture-rail" aria-labelledby="fixture-heading">
-        <div>
-          <p class="section-label">Controlled fixtures</p>
-          <h1 id="fixture-heading">Choose a case</h1>
-          <p class="muted">These files are intentionally vulnerable test data with fake tokens.</p>
-        </div>
-        <!-- The bundled fixtures are known at build time, so the list is in the markup and the page
-             does not shift when the worker reports ready. Buttons stay disabled until then. -->
-        <div id="fixture-list" class="fixture-list" aria-label="Available fixture repositories">
-          <button class="fixture-button" type="button" data-fixture="steering-injection" aria-pressed="false" disabled><strong>Steering injection</strong><span>steering-injection</span></button>
-          <button class="fixture-button" type="button" data-fixture="unbounded-hook" aria-pressed="false" disabled><strong>Unbounded hook</strong><span>unbounded-hook</span></button>
-          <button class="fixture-button" type="button" data-fixture="unsafe-mcp" aria-pressed="false" disabled><strong>Unsafe MCP</strong><span>unsafe-mcp</span></button>
-        </div>
-        <section class="local-project" aria-labelledby="local-heading">
-          <div>
-            <p class="section-label">Your project</p>
-            <h2 id="local-heading" class="rail-heading">Scan your own .kiro</h2>
-            <p class="muted">Files are read in this tab and never uploaded. Only text files inside <code>.kiro/</code> are scanned, and secret-like values show as [REDACTED].</p>
+    <main>
+      <section class="masthead" aria-labelledby="page-title">
+        <div class="shell masthead-grid">
+          <h1 id="page-title" class="headline">Dig up the risky lines in your .kiro config, then <em>verify</em> the fix.</h1>
+          <div class="masthead-aside">
+            <p class="lede">GraveScan checks Kiro settings, hooks, agents, and steering files against ten deterministic rules. It replays the attack behind a finding in a safe simulation, patches an isolated copy, and scans that copy again to show whether the risk is gone.</p>
+            <ul class="boundary-list" aria-label="Safety boundary">
+              <li>Safe simulation. No arbitrary code or network request was executed.</li>
+              <li>Everything runs in this browser tab. Nothing is uploaded.</li>
+            </ul>
           </div>
-          <button id="folder-button" class="quiet-button full-width" type="button" disabled>Choose project folder</button>
-          <input id="folder-input" type="file" webkitdirectory multiple hidden>
-          <details class="paste-box">
-            <summary>Or paste an mcp.json</summary>
-            <div class="paste-body">
-              <label class="paste-label" for="paste-input">mcp.json content</label>
-              <textarea id="paste-input" rows="7" spellcheck="false" autocomplete="off"></textarea>
-              <button id="paste-button" class="quiet-button full-width" type="button" disabled>Scan pasted mcp.json</button>
+        </div>
+        <div class="beam" aria-hidden="true"></div>
+      </section>
+
+      <div id="workbench" class="workbench" aria-busy="false">
+        <section class="case-picker" aria-labelledby="fixture-heading">
+          <div class="shell picker-grid">
+            <header class="section-head picker-head">
+              <span class="index" aria-hidden="true">01</span>
+              <h2 id="fixture-heading">Choose a case</h2>
+              <p class="section-note">These files are intentionally vulnerable test data with fake tokens.</p>
+            </header>
+            <!-- The bundled fixtures are known at build time, so the list is in the markup and the page
+                 does not shift when the worker reports ready. Buttons stay disabled until then. -->
+            <div id="fixture-list" class="fixture-list" role="group" aria-label="Available cases">
+              <button class="fixture-button" type="button" data-fixture="steering-injection" aria-pressed="false" disabled><strong>Steering injection</strong><span class="fixture-note">A steering file tells the agent to print secrets and to reach outside the workspace.</span><code>steering-injection</code></button>
+              <button class="fixture-button" type="button" data-fixture="unbounded-hook" aria-pressed="false" disabled><strong>Unbounded hook</strong><span class="fixture-note">A save hook runs the file path as a command, with no allowlist.</span><code>unbounded-hook</code></button>
+              <button class="fixture-button" type="button" data-fixture="unsafe-mcp" aria-pressed="false" disabled><strong>Unsafe MCP</strong><span class="fixture-note">A shell-capable MCP tool is auto-approved and has no tool allowlist.</span><code>unsafe-mcp</code></button>
             </div>
-          </details>
-          <p id="local-summary" class="muted" hidden></p>
+            <div class="case-actions">
+              <button id="scan-button" class="primary-button" type="button" disabled>Run scan</button>
+              <button id="reset-button" class="quiet-button" type="button" disabled>Reset isolated copy</button>
+            </div>
+            <section class="local-project" aria-labelledby="local-heading">
+              <div class="local-copy">
+                <h3 id="local-heading">Scan your own .kiro</h3>
+                <p class="muted">Files are read in this tab and never uploaded. Only text files inside <code>.kiro/</code> are scanned, and secret-like values show as [REDACTED].</p>
+              </div>
+              <div class="local-controls">
+                <button id="folder-button" class="quiet-button" type="button" disabled>Choose project folder</button>
+                <input id="folder-input" type="file" webkitdirectory multiple hidden>
+                <details class="paste-box">
+                  <summary>Or paste an mcp.json</summary>
+                  <div class="paste-body">
+                    <label class="paste-label" for="paste-input">mcp.json content</label>
+                    <textarea id="paste-input" rows="7" spellcheck="false" autocomplete="off"></textarea>
+                    <button id="paste-button" class="quiet-button" type="button" disabled>Scan pasted mcp.json</button>
+                  </div>
+                </details>
+                <p id="local-summary" class="muted" hidden></p>
+              </div>
+            </section>
+          </div>
         </section>
-        <button id="reset-button" class="quiet-button full-width" type="button" disabled>Reset isolated copy</button>
-        <p class="boundary-note">Safe simulation. No arbitrary code or network request was executed.</p>
-      </aside>
 
-      <section class="evidence-board" aria-labelledby="evidence-heading">
-        <header class="panel-heading">
-          <div>
-            <p class="section-label">Evidence board</p>
-            <h2 id="evidence-heading">Static scan</h2>
-          </div>
-          <div class="scan-controls">
-            <button id="scan-button" class="primary-button" type="button" disabled>Run scan</button>
-            <button id="export-button" class="quiet-button" type="button" disabled>Export Markdown</button>
-          </div>
-        </header>
+        <div class="shell board-grid">
+          <section class="evidence-board" aria-labelledby="evidence-heading">
+            <header class="section-head board-head">
+              <span class="index" aria-hidden="true">02</span>
+              <h2 id="evidence-heading">Findings</h2>
+              <button id="export-button" class="quiet-button" type="button" disabled>Export Markdown</button>
+            </header>
+            <div id="triage-context" class="triage-context" aria-live="polite">
+              <strong id="source-name">Choose a case</strong>
+              <span id="source-boundary">Browser-local analysis. No upload.</span>
+            </div>
+            <div id="scan-summary" class="scan-summary" aria-live="polite" hidden></div>
+            <div class="filters" role="group" aria-label="Finding filters">
+              <label class="field"><span>Severity</span>
+                <span class="select"><select id="severity-filter" disabled>
+                  <option value="all">All severities</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select></span>
+              </label>
+              <label class="field"><span>Rule</span>
+                <span class="select"><select id="rule-filter" disabled><option value="all">All rules</option></select></span>
+              </label>
+            </div>
+            <div id="finding-state" class="state-panel" role="status">Choose a case, then run a scan.</div>
+            <ol id="finding-list" class="finding-list" aria-label="Scan findings"></ol>
+          </section>
 
-        <div id="triage-context" class="triage-context" aria-live="polite">
-          <span class="context-kicker">Triage scope</span>
-          <strong id="source-name">Choose a case</strong>
-          <span id="source-boundary">Browser-local analysis. No upload.</span>
+          <section class="case-file" aria-labelledby="case-heading">
+            <header class="section-head">
+              <span class="index" aria-hidden="true">03</span>
+              <h2 id="case-heading">Case file</h2>
+            </header>
+            <div id="detail-state" class="detail-empty">
+              <p class="detail-empty-lead">Choose a finding to inspect its evidence trail.</p>
+              <ol class="trail-legend" aria-label="Evidence trail stages">
+                <li><strong>Scan</strong><span>Ten rules read the .kiro files and point to the line behind each finding.</span></li>
+                <li><strong>Replay</strong><span>A deterministic simulation checks whether the risky capability is reachable. No project code runs.</span></li>
+                <li><strong>Patch</strong><span>An allowlisted edit is proposed as a diff for you to review.</span></li>
+                <li><strong>Verify</strong><span>The patch goes into an isolated copy, which is scanned and replayed again.</span></li>
+              </ol>
+            </div>
+            <article id="finding-detail" class="finding-detail" aria-live="polite"></article>
+          </section>
         </div>
-        <div id="scan-summary" class="scan-summary" aria-live="polite" hidden></div>
-
-        <div class="filters" aria-label="Finding filters">
-          <label>Severity
-            <select id="severity-filter" disabled>
-              <option value="all">All severities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </label>
-          <label>Rule
-            <select id="rule-filter" disabled><option value="all">All rules</option></select>
-          </label>
-        </div>
-
-        <div id="finding-state" class="state-panel" role="status">Select a fixture, then run a scan.</div>
-        <ol id="finding-list" class="finding-list" aria-label="Scan findings"></ol>
-      </section>
-
-      <section class="case-file" aria-labelledby="case-heading">
-        <header class="panel-heading">
-          <div>
-            <p class="section-label">Case file</p>
-            <h2 id="case-heading">Finding detail</h2>
-          </div>
-        </header>
-        <div id="detail-state" class="state-panel">Choose a finding to inspect its evidence trail.</div>
-        <article id="finding-detail" class="finding-detail" aria-live="polite"></article>
-      </section>
+      </div>
     </main>
 
-    <footer class="footer-note">GraveScan reports evidence and verification status. It does not claim that a project is fully secure.</footer>
+    <footer class="site-footer">
+      <div class="shell">
+        <p>GraveScan reports evidence and verification status. It does not claim that a project is fully secure.</p>
+      </div>
+    </footer>
     <script type="module" src="/assets/app.js"></script>
   </body>
 </html>

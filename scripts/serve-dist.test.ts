@@ -15,6 +15,8 @@ beforeAll(async () => {
   mkdirSync(path.join(dist, "assets"), { recursive: true });
   writeFileSync(path.join(dist, "index.html"), "<!doctype html>");
   writeFileSync(path.join(dist, "assets", "app.js"), "export {};");
+  writeFileSync(path.join(dist, "icon0.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>");
+  writeFileSync(path.join(dist, "favicon.ico"), Buffer.from([0, 0, 1, 0]));
   writeFileSync(path.join(dist, "_headers"), "/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n");
   writeFileSync(path.join(parent, "secret.json"), "{}");
   server = createStaticServer(dist);
@@ -43,6 +45,14 @@ describe("local static server", () => {
     expect(asset.headers.get("content-type")).toContain("text/javascript");
     expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     expect(page.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("serves the root icon files with image types", async () => {
+    const svg = await fetch(`${base}/icon0.svg`);
+    expect(svg.status).toBe(200);
+    expect(svg.headers.get("content-type")).toBe("image/svg+xml");
+    expect(svg.headers.get("x-content-type-options")).toBe("nosniff");
+    expect((await fetch(`${base}/favicon.ico`)).headers.get("content-type")).toBe("image/x-icon");
   });
 
   it("refuses traversal, the headers file, unknown types, and writes", async () => {

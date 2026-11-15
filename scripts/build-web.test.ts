@@ -1,8 +1,9 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { listFixtures } from "@gravescan/fixtures";
-import { buildWeb, CONTENT_SECURITY_POLICY } from "./build-web.ts";
+import { makeTempDir, removeDir } from "../packages/fixtures/test/helpers.ts";
+import { buildWeb, copyPublicFiles, CONTENT_SECURITY_POLICY } from "./build-web.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const dist = path.join(root, "dist");
@@ -62,6 +63,35 @@ describe("static web build", () => {
   it("keeps the page renderer out of HTML injection sinks", () => {
     const source = readFileSync(path.join(root, "apps/web/src/static/app.js"), "utf8");
     expect(source).not.toMatch(/\b(?:innerHTML|outerHTML|insertAdjacentHTML|document\.write)\b/);
+  });
+
+  it("copies the icon set to the site root and every root link in the document resolves", () => {
+    const index = readFileSync(path.join(dist, "index.html"), "utf8");
+    for (const file of ["favicon.ico", "icon0.svg", "icon1.png", "apple-icon.png", "manifest.json", "web-app-manifest-192x192.png", "web-app-manifest-512x512.png"]) {
+      expect(existsSync(path.join(dist, file)), file).toBe(true);
+    }
+    const rootLinks = [...index.matchAll(/(?:href|src)="(\/[^"/][^"]*)"/g)].map((match) => match[1] ?? "").filter((link) => !link.startsWith("/assets/"));
+    expect(rootLinks).toEqual(expect.arrayContaining(["/favicon.ico", "/icon0.svg", "/icon1.png", "/apple-icon.png", "/manifest.json"]));
+    for (const link of rootLinks) expect(existsSync(path.join(dist, link.slice(1))), link).toBe(true);
+    const manifest = JSON.parse(readFileSync(path.join(dist, "manifest.json"), "utf8")) as { icons: { src: string }[] };
+    for (const icon of manifest.icons) expect(existsSync(path.join(dist, icon.src.slice(1))), icon.src).toBe(true);
+  });
+
+  it("refuses a public file that would replace a build output and skips dotfiles", () => {
+    const parent = makeTempDir();
+    try {
+      const from = path.join(parent, "public");
+      const to = path.join(parent, "out");
+      mkdirSync(from);
+      mkdirSync(to);
+      writeFileSync(path.join(from, "icon.svg"), "<svg/>");
+      writeFileSync(path.join(from, ".DS_Store"), "");
+      expect(copyPublicFiles(from, to)).toEqual(["icon.svg"]);
+      writeFileSync(path.join(from, "_headers"), "/*\n  X-Frame-Options: ALLOWALL\n");
+      expect(() => copyPublicFiles(from, to)).toThrow(/build output/);
+    } finally {
+      removeDir(parent);
+    }
   });
 
   it("sends isolation and permission headers", () => {

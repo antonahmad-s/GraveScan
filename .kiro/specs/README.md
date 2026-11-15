@@ -12,5 +12,6 @@ Each spec follows Requirements, then Design, then Tasks.
 | 06 | local-project-scan | scan a visitor's own .kiro in the browser, CLI `--path`, secret redaction, linear-time rules |
 | 07 | worker-and-code-scanning | engine in a Web Worker, risk-ordered triage, load and layout fixes, SARIF output, isolation headers |
 | 08 | trusted-renderer-and-sarif-ci | DOM-only renderer, Trusted Types, GitHub SARIF upload workflow |
+| 09 | editorial-workbench-and-icons | redesigned responsive workbench, evidence trail, inline errors, owner's logo as favicon and app icon |
 
-Specs 01 through 08 are implemented and verified with `pnpm verify` (ESLint, tsc, Vitest with fast-check), `pnpm test:e2e` (Playwright), and `pnpm self-scan`. See `docs/ui-delivery-gate.md` for the browser delivery gate.
+Specs 01 through 09 are implemented and verified with `pnpm verify` (ESLint, tsc, Vitest with fast-check), `pnpm test:e2e` (Playwright), and `pnpm self-scan`. See `docs/ui-delivery-gate.md` for the browser delivery gate.
