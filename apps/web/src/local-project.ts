@@ -82,6 +82,10 @@ export type LocalValidation =
   | { readonly ok: true; readonly files: FixtureFile[] }
   | { readonly ok: false; readonly message: string };
 
+function textBytes(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
 /** Re-checks files at the engine boundary, whatever the page passed in. */
 export function validateLocalFiles(input: unknown): LocalValidation {
   if (!Array.isArray(input) || input.length === 0) return { ok: false, message: "No files were provided." };
@@ -97,9 +101,9 @@ export function validateLocalFiles(input: unknown): LocalValidation {
       return { ok: false, message: "Only text files inside .kiro/ can be scanned." };
     }
     if (seen.has(path)) return { ok: false, message: "The same file path was provided twice." };
-    // Text has already been decoded here, so the limits count characters rather than bytes.
-    if (content.length > LOCAL_LIMITS.maxFileBytes) return { ok: false, message: "A file is larger than 1 MB." };
-    total += content.length;
+    const bytes = textBytes(content);
+    if (bytes > LOCAL_LIMITS.maxFileBytes) return { ok: false, message: "A file is larger than 1 MB." };
+    total += bytes;
     if (total > LOCAL_LIMITS.maxTotalBytes) return { ok: false, message: "The files are larger than 5 MB in total." };
     seen.add(path);
     files.push({ path, content });

@@ -59,6 +59,13 @@
           </div>
         </header>
 
+        <div id="triage-context" class="triage-context" aria-live="polite">
+          <span class="context-kicker">Triage scope</span>
+          <strong id="source-name">Choose a case</strong>
+          <span id="source-boundary">Browser-local analysis. No upload.</span>
+        </div>
+        <div id="scan-summary" class="scan-summary" aria-live="polite" hidden></div>
+
         <div class="filters" aria-label="Finding filters">
           <label>Severity
             <select id="severity-filter" disabled>
