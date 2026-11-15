@@ -20,6 +20,9 @@ const HEADERS = `/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
@@ -55,12 +58,13 @@ export async function buildWeb(): Promise<void> {
   rmSync(dist, { recursive: true, force: true });
   mkdirSync(assets, { recursive: true });
 
+  // A classic (non-module) worker: the bundle has no imports, and classic workers run everywhere.
   const engine = await build({
-    entryPoints: [path.join(root, "apps/web/src/engine.ts")],
-    outfile: path.join(assets, "engine.js"),
+    entryPoints: [path.join(root, "apps/web/src/engine-worker.ts")],
+    outfile: path.join(assets, "worker.js"),
     write: false,
     bundle: true,
-    format: "esm",
+    format: "iife",
     platform: "browser",
     target: "es2022",
     minify: true,
@@ -68,21 +72,22 @@ export async function buildWeb(): Promise<void> {
     legalComments: "none",
     logLevel: "warning",
   });
-  const engineOutput = engine.outputFiles?.find((file) => file.path.endsWith("engine.js"));
-  if (engineOutput === undefined) throw new Error("esbuild did not return the browser engine.");
+  const engineOutput = engine.outputFiles?.find((file) => file.path.endsWith("worker.js"));
+  if (engineOutput === undefined) throw new Error("esbuild did not return the engine worker.");
 
-  const engineUrl = writeAsset("engine", ".js", engineOutput.contents);
+  const workerUrl = writeAsset("worker", ".js", engineOutput.contents);
   const fixturesUrl = writeAsset("fixtures", ".json", JSON.stringify(fixtureBundle()));
   const stylesUrl = writeAsset("styles", ".css", readFileSync(path.join(staticDir, "styles.css")));
 
   let app = readFileSync(path.join(staticDir, "app.js"), "utf8");
-  app = replaceOnce(app, '"./engine.js"', `"./${path.basename(engineUrl)}"`);
+  app = replaceOnce(app, '"/assets/engine-worker.js"', `"${workerUrl}"`);
   app = replaceOnce(app, '"/assets/fixtures.json"', `"${fixturesUrl}"`);
   const appUrl = writeAsset("app", ".js", app);
 
   let markup = readFileSync(path.join(staticDir, "index.html"), "utf8");
   markup = replaceOnce(markup, 'href="/assets/styles.css"', `href="${stylesUrl}"`);
   markup = replaceOnce(markup, 'src="/assets/app.js"', `src="${appUrl}"`);
+  markup = replaceOnce(markup, 'href="/assets/fixtures.json"', `href="${fixturesUrl}"`);
   writeFileSync(path.join(dist, "index.html"), markup);
   writeFileSync(path.join(dist, "_headers"), HEADERS);
 }

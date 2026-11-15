@@ -25,6 +25,9 @@ test("demo flow: scan, replay, patch, verify, compare, export, reset", async ({ 
   await scanUnsafeMcp(page);
   await expect(page.getByLabel("Findings by severity")).toContainText(/3\s*high/);
   await expect(page.getByLabel("Findings by severity")).toContainText(/1\s*medium/);
+  // Highest risk first: the three high findings come before the medium one, and a high is selected.
+  await expect(page.locator(".finding-button .severity")).toHaveText(["high", "high", "high", "medium"]);
+  await expect(page.locator('.finding-button[aria-current="true"] .severity')).toHaveText("high");
   await page.getByRole("button", { name: /GRAVE-001/ }).click();
   await expect(page.locator(".evidence").first()).toContainText("autoApprove");
 
@@ -200,6 +203,6 @@ test("the full flow only loads same-origin static files and sends strict headers
 
   if (baseURL === undefined) throw new Error("Playwright baseURL is required for this test.");
   const origin = new URL(baseURL).origin;
-  const allowed = new RegExp(`^GET ${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/$|/assets/(?:app|engine|fixtures|styles)\\.[a-f0-9]{12}\\.(?:js|json|css)$)`);
+  const allowed = new RegExp(`^GET ${origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:/$|/assets/(?:app|worker|fixtures|styles)\\.[a-f0-9]{12}\\.(?:js|json|css)$)`);
   expect(requests.filter((entry) => !allowed.test(entry))).toEqual([]);
 });

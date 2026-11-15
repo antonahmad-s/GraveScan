@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>GraveScan: Security evidence workbench</title>
     <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="preload" href="/assets/fixtures.json" as="fetch" crossorigin="anonymous">
   </head>
   <body>
     <a class="skip-link" href="#workbench">Skip to workspace</a>
@@ -24,7 +25,13 @@
           <h1 id="fixture-heading">Choose a case</h1>
           <p class="muted">These files are intentionally vulnerable test data with fake tokens.</p>
         </div>
-        <div id="fixture-list" class="fixture-list" aria-label="Available fixture repositories"></div>
+        <!-- The bundled fixtures are known at build time, so the list is in the markup and the page
+             does not shift when the worker reports ready. Buttons stay disabled until then. -->
+        <div id="fixture-list" class="fixture-list" aria-label="Available fixture repositories">
+          <button class="fixture-button" type="button" data-fixture="steering-injection" aria-pressed="false" disabled><strong>Steering injection</strong><span>steering-injection</span></button>
+          <button class="fixture-button" type="button" data-fixture="unbounded-hook" aria-pressed="false" disabled><strong>Unbounded hook</strong><span>unbounded-hook</span></button>
+          <button class="fixture-button" type="button" data-fixture="unsafe-mcp" aria-pressed="false" disabled><strong>Unsafe MCP</strong><span>unsafe-mcp</span></button>
+        </div>
         <section class="local-project" aria-labelledby="local-heading">
           <div>
             <p class="section-label">Your project</p>

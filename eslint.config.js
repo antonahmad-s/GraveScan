@@ -20,6 +20,7 @@ export default tseslint.config(
       sourceType: "module",
       globals: {
         Blob: "readonly",
+        Worker: "readonly",
         URL: "readonly",
         document: "readonly",
         fetch: "readonly",
