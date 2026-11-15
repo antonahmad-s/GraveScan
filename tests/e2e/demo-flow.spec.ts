@@ -122,10 +122,31 @@ test("one visitor's patch does not change another visitor's copy", async ({ brow
   await alice.getByRole("button", { name: "Apply to isolated copy" }).click();
   await expect(alice.getByText("Simulation blocked", { exact: true })).toBeVisible();
 
-  // Bob never scans, so a shared copy would already contain Alice's patch and replay as blocked.
-  const response = await bobContext.request.post("/api/replay", { data: { fixture: "unsafe-mcp", scenarioId: "MCP-TOOL-ESCALATION" } });
-  expect((await response.json()).replay.result).toBe("exposed");
+  // Bob scans the same fixture; a shared copy would already contain Alice's patch and replay as blocked.
+  const bob = await bobContext.newPage();
+  await scanUnsafeMcp(bob);
+  await bob.getByRole("button", { name: /GRAVE-001/ }).click();
+  await bob.getByRole("button", { name: "Run safe replay" }).click();
+  await expect(bob.getByText("Capability exposure reproduced safely.")).toBeVisible();
 
   await aliceContext.close();
   await bobContext.close();
+});
+
+test("the full flow only loads same-origin static files and sends strict headers", async ({ page, baseURL }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
+  const response = await page.goto("/");
+  expect(response?.headers()["content-security-policy"]).toContain("connect-src 'self'");
+  expect(response?.headers()["x-content-type-options"]).toBe("nosniff");
+
+  await scanUnsafeMcp(page);
+  await page.getByRole("button", { name: /GRAVE-001/ }).click();
+  await page.getByRole("button", { name: "Run safe replay" }).click();
+  await page.getByRole("button", { name: "Generate patch" }).click();
+  await page.getByRole("button", { name: "Apply to isolated copy" }).click();
+  await expect(page.getByText("Simulation blocked", { exact: true })).toBeVisible();
+
+  const allowed = ["/", "/assets/styles.css", "/assets/app.js", "/assets/engine.js", "/assets/fixtures.json"].map((route) => `GET ${new URL(route, baseURL).href}`);
+  expect(requests.filter((entry) => !allowed.includes(entry))).toEqual([]);
 });

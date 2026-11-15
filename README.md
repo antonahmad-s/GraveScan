@@ -29,7 +29,7 @@ GraveScan also scans its own `.kiro/` directory (`pnpm self-scan`) in a Kiro hoo
 
 ## Stack
 
-TypeScript end to end on Node 22: a dependency-free `http` server and browser UI, Zod, Vitest, fast-check, Playwright, ESLint, and pnpm. The PRD planned Next.js; [Spec 05](.kiro/specs/05-product-ui-demo-flow/design.md) records why the project kept a plain Node server.
+TypeScript end to end: Zod, Vitest, fast-check, Playwright, ESLint, esbuild, and pnpm on Node 22. The web workbench is a static site. esbuild bundles the scanner, simulator, patcher, and reporting packages into one browser module, so every scan, replay, and patch runs in the visitor's own tab. Cloudflare Workers serves the files with no server code. The PRD planned Next.js; [Spec 05](.kiro/specs/05-product-ui-demo-flow/design.md) records why the project moved to a static browser build.
 
 ## Quick start
 
@@ -39,10 +39,12 @@ Requires Node 22.18 or newer and pnpm 10.
 pnpm install
 pnpm verify          # ESLint, tsc, Vitest + fast-check
 pnpm self-scan       # GraveScan's rules against this repo's .kiro/
-pnpm dev             # http://127.0.0.1:3000
+pnpm dev             # builds dist/ and serves it at http://127.0.0.1:3000
 ```
 
-The UI accepts only its three bundled fixtures. It cannot upload repositories, execute shell code, or make outbound requests.
+`pnpm build` writes the static site to `dist/`. `pnpm preview` serves the same folder through Wrangler's local Workers runtime.
+
+The UI accepts only its three bundled fixtures. It cannot upload repositories, execute shell code, or make outbound requests. Its only network traffic is loading its own static files.
 
 ### CLI
 
@@ -64,18 +66,22 @@ To use an existing Chromium build instead of downloading one, set `GRAVESCAN_CHR
 
 ## Deploy
 
-The app needs a long-running Node process, because each visitor's isolated copy lives on local disk and generated patches stay in memory until applied. Serverless function hosting does not fit.
+The site deploys to Cloudflare Workers as an assets-only Worker ([`wrangler.jsonc`](wrangler.jsonc)). No Worker script runs, there is no database, and no secrets are needed. Static asset requests are free on the Workers Free plan.
 
-```bash
-docker compose up --build    # http://localhost:3000
-```
+Automatic deploys from GitHub (Workers Builds):
 
-The `Dockerfile` works on container hosts such as Render, Railway, or Fly.io. The server reads `PORT` and `HOST` (set `HOST=0.0.0.0` in containers; the image already does) and exposes `GET /healthz`. Each browser gets its own session cookie and isolated copies, so concurrent judges do not affect each other. No login is required.
+1. In the Cloudflare dashboard, open **Workers & Pages → Create → Import a repository** and select this repository.
+2. Set the Worker name to `gravescan`. It must match `name` in `wrangler.jsonc`.
+3. Build command: `pnpm build`. Deploy command: `npx wrangler deploy`. Root directory: `/`.
+4. Production branch: `main`. Each push to `main` then builds and deploys to `https://gravescan.<your-subdomain>.workers.dev`.
+
+`dist/_headers` sets the Content Security Policy, `nosniff`, `Referrer-Policy`, and `X-Frame-Options` for every file. Each visitor's isolated copy lives in their own tab and is gone on reload, so concurrent judges do not affect each other. No login is required.
 
 ## Repository layout
 
 ```text
-apps/web/             Node HTTP server and browser UI
+apps/web/             browser UI and the in-browser engine
+scripts/              static build, local static server, docs and repo checks
 packages/scanner/     parser + rule engine
 packages/simulator/   safe attack scenarios
 packages/patcher/     patch generation + verification

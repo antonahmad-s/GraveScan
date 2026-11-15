@@ -1,16 +1,13 @@
-import { readWorkCopy, type Result, type WorkCopy } from "@gravescan/fixtures";
-import { scanFiles } from "@gravescan/scanner";
+import type { FixtureFile, Result } from "@gravescan/fixtures/browser";
+import { scanFiles } from "@gravescan/scanner/browser";
 import { replayScenario } from "@gravescan/simulator";
 import type { Patch, PatchError, PatchVerification } from "./schemas.ts";
 
-export function verifyPatch(
-  copy: WorkCopy,
+export function verifyPatchFiles(
+  files: readonly FixtureFile[],
   patch: Patch,
-  base?: string,
 ): Result<PatchVerification, PatchError> {
-  const loaded = readWorkCopy(copy, base);
-  if (!loaded.ok) return { ok: false, error: { code: "WORK_COPY_INVALID", detail: loaded.error.code } };
-  const scan = scanFiles(loaded.value);
+  const scan = scanFiles(files);
   const highCriticalAfter = scan.findings.filter((finding) => finding.severity === "high" || finding.severity === "critical").length;
   // Finding IDs carry line numbers, so a reformat changes them. A real fix must lower the rule's count in the file.
   const ruleCountAfter = scan.findings.filter((finding) => finding.ruleId === patch.ruleId && finding.file === patch.findingFile).length;

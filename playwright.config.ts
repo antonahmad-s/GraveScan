@@ -17,8 +17,9 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "node apps/web/src/server.ts",
-    url: `http://127.0.0.1:${port}/healthz`,
+    // Same static files Cloudflare serves, built fresh and served with dist/_headers applied.
+    command: "node scripts/build-web.ts && node scripts/serve-dist.ts",
+    url: `http://127.0.0.1:${port}/`,
     env: { PORT: String(port), HOST: "127.0.0.1" },
     reuseExistingServer: false,
     timeout: 30_000,

@@ -1,0 +1,10 @@
+{
+  // Assets-only Worker: Cloudflare serves dist/ directly and no Worker code runs per request.
+  // The name must match the Worker name chosen in the Cloudflare dashboard.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "gravescan",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}

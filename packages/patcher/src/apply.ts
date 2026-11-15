@@ -7,7 +7,32 @@ import {
   type Result,
   type WorkCopy,
 } from "@gravescan/fixtures";
-import type { Patch, PatchApplyResult, PatchError } from "./schemas.ts";
+import type { Finding } from "@gravescan/scanner/browser";
+import { generatePatchForFiles } from "./generate.ts";
+import type { Patch, PatchApplyResult, PatchError, PatchVerification } from "./schemas.ts";
+import { verifyPatchFiles } from "./verify.ts";
+
+// On-disk wrappers used by the CLI and the MCP dev server. The browser uses the in-memory functions directly.
+
+export function generatePatch(
+  copy: WorkCopy,
+  finding: Finding,
+  base?: string,
+): Result<Patch, PatchError> {
+  const loaded = readWorkCopy(copy, base);
+  if (!loaded.ok) return { ok: false, error: { code: "WORK_COPY_INVALID", detail: loaded.error.code } };
+  return generatePatchForFiles(loaded.value, finding);
+}
+
+export function verifyPatch(
+  copy: WorkCopy,
+  patch: Patch,
+  base?: string,
+): Result<PatchVerification, PatchError> {
+  const loaded = readWorkCopy(copy, base);
+  if (!loaded.ok) return { ok: false, error: { code: "WORK_COPY_INVALID", detail: loaded.error.code } };
+  return verifyPatchFiles(loaded.value, patch);
+}
 
 function error(code: PatchError["code"], file: string): Result<PatchApplyResult, PatchError> {
   if (code === "PATCH_PATH_REJECTED") return { ok: false, error: { code, file } };

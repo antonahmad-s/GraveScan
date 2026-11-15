@@ -11,7 +11,7 @@ Honest, evidence-based write-up. Fill each row as work happens; delete anything 
 | Steering | Product contract, security boundaries, testing contract, UI direction | `.kiro/steering/` |
 | MCP | Custom `gravescan-dev` stdio server: `list_fixtures`, `run_fixture_scan`, `run_attack_replay`, `get_finding`, `generate_patch`, `verify_patch`. Disabled by default until a Kiro CLI user opts in. GitHub MCP optional. | `packages/mcp-dev/src/server.ts`, `.kiro/settings/mcp.json` |
 | PBT | fast-check: determinism, parser robustness, evidence validity, patch idempotence, no new high-risk finding | `tests/property/` |
-| Skills | `antislop` (MIT, v3.2.29) installed in `.kiro/skills/` from github.com/miqdadbadjuber/anti-slop. `antislop-code` governs code comments; `antislop-ui`, `antislop-human`, and `antislop-layoutmobile` apply from Spec 05. | `.kiro/skills/` |
+| Skills | `antislop` (MIT, v3.2.29) installed in `.kiro/skills/` from github.com/miqdadbadjuber/anti-slop. `antislop-code` governs code comments; `antislop-ui`, `antislop-human`, and `antislop-layoutmobile` apply from Spec 05. `security-audit` (MIT, cloudflare/security-audit-skill at c1c8a8c) ran a full `quick`-profile audit; see "Security audit" below. | `.kiro/skills/` |
 | Powers | List only the powers actually used. | _TODO_ |
 
 ## Real incidents log
@@ -29,6 +29,7 @@ Record at least one concrete case where a spec, hook, or property test caught a 
 
 - 2026-11-13. A tablet-width test caught keyboard focus dropping to `<body>` after Enter on a finding. `renderFindings()` cleared the list before recording which item had focus. Fixed by recording focus first and restoring it after the rebuild; the Playwright keyboard test now asserts it.
 - 2026-11-13. A before/after comparison test caught that resolving GRAVE-001 also reported GRAVE-009 as resolved. The patch reformatted `mcp.json`, moving the canary token from line 7 to line 6, and finding IDs include the line. Patch verification had the same flaw: a patch that only moved a risky line would have counted as a fix. Both now match findings by rule, file, and evidence text. A test proves a move-only patch is `Needs review`.
+- 2026-11-13. Moving the web engine into the browser for free Cloudflare hosting: writing the engine's mutation test showed that `reset` copied files from the caller's fixture bundle on every call, so any later edit to that bundle would change each new reset. The engine now snapshots the pristine files once at creation, and the test edits the bundle after load to prove it.
 
 ## Vibe vs spec comparison
 - _TODO: pick one module, note time, rework, and bugs under each approach._
@@ -49,3 +50,12 @@ Second run, after the rule fixes: **2 findings in GraveScan's own config**.
 | GRAVE-010 Medium: no sandbox policy | project-wide | Added a `Sandbox policy` heading to `.kiro/steering/security-boundaries.md` |
 
 The third run flagged the new self-scan hook itself (`pnpm self-scan` was not in the allowlist). It was added deliberately. Current result: **0 findings**, enforced by `pnpm self-scan` in CI.
+
+## Security audit (cloudflare/security-audit-skill)
+
+Run 1, 2026-11-13, on commit `23ecc8c`, profile `quick`. The skill keeps audit output outside the repository; the full run lives at `security-audit-skill/GraveScan/run-1/` next to the repo in the development sandbox (`REPORT.md`, `findings.json`, `coverage-ledger.json`).
+
+- **Process.** 4 reconnaissance agents, 5 hunters over 15 coverage units, 1 final coverage critic, and 1 independent verifier. Both skill validators (`validate-findings.cjs`, `validate-coverage-ledger.cjs`) pass.
+- **Sandbox.** Target code ran only inside a bubblewrap sandbox: unprivileged uid, no network, empty environment, read-only minimal mounts, a 64 MiB tmpfs as the only writable path, and process, memory, file, and time limits. A reconnaissance agent found the first version of the sandbox exposed the whole host read-only and did not enforce its process limit; it was fixed before any target code ran.
+- **Result.** 1 confirmed **low** finding: a request whose session is evicted while its body is still pending recreates that session's work copy, so disk use is no longer bounded by `maxSessions` (reproduced: 5 directories against a cap of 2). Hardening notes include the `--fail-on` inherited-key check (`constructor` passes) and missing request timeouts.
+- **Coverage.** 13 units covered, 1 confirmed, 4 deferred by the final critic (cross-visitor eviction, simulator replay, Markdown report, and one reopened unit). This is a partial pass by design of the `quick` profile.

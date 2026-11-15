@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { RuleIdSchema } from "@gravescan/scanner";
+import { RuleIdSchema } from "@gravescan/scanner/browser";
 import { ReplayResultSchema } from "@gravescan/simulator";
 
 export const PatchSchema = z.object({

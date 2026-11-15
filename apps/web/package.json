@@ -6,9 +6,6 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "scripts": {
-    "dev": "node src/server.ts"
-  },
   "dependencies": {
     "@gravescan/fixtures": "workspace:*",
     "@gravescan/patcher": "workspace:*",

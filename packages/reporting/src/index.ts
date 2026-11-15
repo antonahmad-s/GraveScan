@@ -1,4 +1,4 @@
-import type { Finding, ScanResult } from "@gravescan/scanner";
+import type { Finding, ScanResult } from "@gravescan/scanner/browser";
 
 export const PACKAGE = "@gravescan/reporting" as const;
 

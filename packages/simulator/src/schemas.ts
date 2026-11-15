@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FindingSchema, RuleIdSchema } from "@gravescan/scanner";
+import { FindingSchema, RuleIdSchema } from "@gravescan/scanner/browser";
 
 export const AttackScenarioIdSchema = z.enum([
   "MCP-TOOL-ESCALATION",
