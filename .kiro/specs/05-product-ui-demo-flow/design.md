@@ -3,36 +3,34 @@
 ## Design Read
 Reading this as: security workbench for developers and technical judges, in a forensic incident-room visual language, dial ENERGY 2 / RHYTHM 3 / MOTION 1.
 
-## Runtime decision: Node HTTP server, not Next.js
+## Runtime decision: static site with an in-browser engine
 
-The PRD planned Next.js. The project keeps a dependency-free Node 22 `http` server in `apps/web/src/server.ts`. It started as a workaround while the sandbox had no npm registry access. With the registry available, the decision was re-evaluated and kept for these reasons:
+The PRD planned Next.js. The first build used a dependency-free Node 22 `http` server with per-visitor work copies on disk, packaged with a Dockerfile. That needs an always-on container host, which has no free tier that fits a hackathon judged weeks after submission. The project now ships as a static site on Cloudflare Workers static assets, for these reasons:
 
-- **The demo needs a persistent process.** Each visitor's isolated copy lives on local disk under `.gravescan-work/sessions/<id>/`, and generated patches live in memory until applied. Serverless functions (the default Next.js deployment target) do not share memory or local disk between requests, so generate-then-apply would break.
-- **Smaller attack surface.** The server has exactly six static and health routes plus six POST API routes, with no framework routing, middleware, or server components to audit.
-- **It is verified.** Unit, HTTP integration, and Playwright e2e tests cover every route and control.
-
-Migrating to Next.js would only pay off with a persistent Node host and a component-heavy UI, neither of which the MVP needs.
+- **The engine is pure.** Scanning, replay, patch generation, apply, verification, and reporting all operate on `{ path, content }` arrays. Only fixture loading and the CLI's work copies touch the disk, and those stay in the Node entry points. Each package also has a `browser` entry with no Node built-ins, and esbuild bundles them into `dist/assets/engine.js` (about 87 KB minified).
+- **Isolation comes by construction.** Each tab creates its own engine, so there is no shared state to evict, leak, or exhaust. The low audit finding about an evicted session's copy being recreated on disk no longer has code to apply to.
+- **It is free and has no cold start.** An assets-only Worker runs no script, and static asset requests are free on the Workers Free plan. No database is needed. Supabase was rejected because free projects pause after a week without activity. Durable Objects and Containers were rejected as more moving parts, and Containers need a paid plan.
+- **Smaller attack surface.** There are no POST routes, cookies, request bodies, or server-side file paths. The page makes five GET requests, all for its own static files, and the Playwright suite fails if it makes any other request.
 
 ```mermaid
 flowchart LR
-  B[Browser] -->|HTTP + session cookie| W[Node web server]
-  W --> F[Trusted fixture loader]
-  W --> S[Scanner]
-  W --> R[Simulator]
-  W --> P[Patcher]
-  W --> X[Reporting]
-  P --> C[".gravescan-work/sessions/&lt;id&gt;/ isolated copy"]
+  B[Browser tab] -->|GET static files| CF[Cloudflare static assets]
+  B --> E["Engine (bundled in engine.js)"]
+  E --> F["fixtures.json, built from the trusted loader"]
+  E --> S[Scanner]
+  E --> R[Simulator]
+  E --> P[Patcher]
+  E --> X[Reporting]
+  P --> C[In-memory isolated copy]
 ```
 
 ## Visitor isolation
 
 A public demo URL is shared by every judge, so one visitor's patch must not change another visitor's results.
 
-- The first POST issues a random `gravescan_session` cookie: `HttpOnly; SameSite=Strict; Path=/`, plus `Secure` when the request arrived over HTTPS through a proxy.
-- Each session has its own work-copy base, fixture baselines, applied-patch log, and patch map.
-- At most 50 sessions are kept. The least recently used session is evicted and its directory is deleted.
-- On startup the server deletes the sessions directory, because copies from a previous process have no live session.
-- The work root must sit inside `.gravescan-work` or the OS temp directory, so a misconfiguration cannot point recursive deletion at an arbitrary path.
+- `createEngine(bundle)` snapshots the pristine fixture files once. Each scan or reset copies that snapshot, and patches apply to the copy only.
+- Every response is passed through `structuredClone`, so UI code cannot change engine state by editing a returned object.
+- State lives in the tab's memory and is gone on reload. Nothing is stored server side.
 
 ## Screen structure
 
@@ -43,20 +41,26 @@ A public demo URL is shared by every judge, so one visitor's patch must not chan
 
 On narrow screens, these regions stack in the same DOM order. Rebuilding a list keeps keyboard focus on the same item.
 
-## State and API
+## State and actions
 
-| Route | Method | Behavior |
-|---|---|---|
-| `/healthz` | GET | Liveness probe for hosting and Docker |
-| `/api/fixtures` | GET | Returns fixed fixture IDs |
-| `/api/scan` | POST | Creates or resets the visitor's isolated copy and records it as the baseline |
-| `/api/replay` | POST | Replays an associated static scenario against the current copy |
-| `/api/patch/generate` | POST | Finds a scan finding and generates an allowlisted patch |
-| `/api/patch/apply` | POST | Applies a stored patch, verifies it, and returns a comparison with the baseline |
-| `/api/report` | POST | Returns a Markdown before/after report built by `@gravescan/reporting` |
-| `/api/reset` | POST | Restores a fresh isolated copy, clears its patch log, and scans it |
+`app.js` calls `engine.call(action, payload)`. The action names keep the earlier route names so the UI code did not change.
 
-Static responses carry a Content Security Policy limited to same-origin scripts, styles, and requests. No user input reaches filesystem path resolution or command execution.
+| Action | Behavior |
+|---|---|
+| `/api/scan` | Creates or resets the visitor's isolated copy and records it as the baseline |
+| `/api/replay` | Replays an associated static scenario against the current copy |
+| `/api/patch/generate` | Finds a scan finding and generates an allowlisted patch |
+| `/api/patch/apply` | Applies a stored patch with compare-and-set, verifies it, and returns a comparison with the baseline |
+| `/api/report` | Returns a Markdown before/after report built by `@gravescan/reporting` |
+| `/api/reset` | Restores a fresh isolated copy, clears its patch log, and scans it |
+
+Errors are `EngineError` values with a code and a user-facing message. The build writes `dist/_headers`, which applies a Content Security Policy limited to same-origin scripts, styles, and requests, plus `nosniff`, `Referrer-Policy: no-referrer`, and `X-Frame-Options: DENY`. No user input reaches path resolution or command execution.
+
+## Build and hosting
+
+- `pnpm build` (`scripts/build-web.ts`) writes `dist/`: `index.html`, `assets/app.js`, `assets/styles.css`, `assets/engine.js`, `assets/fixtures.json`, and `_headers`.
+- `pnpm dev` and Playwright serve `dist/` with `scripts/serve-dist.ts`, which applies the same `_headers`.
+- `wrangler.jsonc` declares an assets-only Worker named `gravescan`. Workers Builds runs `pnpm build` and `npx wrangler deploy` on each push to `main`.
 
 ## Finding identity across patches
 

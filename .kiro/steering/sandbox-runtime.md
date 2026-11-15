@@ -8,3 +8,4 @@ This repository is developed in a sandbox where `/root` is read-only and outboun
 - If npm registry access is blocked, report the exact error and run no dependency-install workaround that vendors unreviewed code.
 - For headless browser validation in this sandbox, use the bundled `chrome-headless-shell` executable and a writable `HOME` such as `/tmp/gravescan-browser-home`. Standard Chrome requires `--no-zygote` here because crashpad cannot use read-only `/root`.
 - Background processes end with their tool invocation. Start any local server and browser check in the same bounded validation command.
+- Wrangler writes config under `HOME`. Run `wrangler deploy --dry-run` or `wrangler dev` with a writable `HOME` such as `/tmp/gravescan-browser-home`. Never run `wrangler login` or a real deploy from the sandbox; deploys happen through Cloudflare Workers Builds from GitHub.
