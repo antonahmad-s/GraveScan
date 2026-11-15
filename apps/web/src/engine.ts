@@ -80,9 +80,8 @@ export function createEngine(bundle: FixtureBundle): Engine {
     return state;
   }
 
-  function current(fixture: SourceId): { state: FixtureState; report: ScanResult } {
-    const state = states.get(fixture) ?? reset(fixture);
-    return { state, report: scanFiles(state.files) };
+  function current(fixture: SourceId): FixtureState {
+    return states.get(fixture) ?? reset(fixture);
   }
 
   function call(route: string, payload: Record<string, unknown>): unknown {
@@ -92,19 +91,22 @@ export function createEngine(bundle: FixtureBundle): Engine {
       return respond({ fixture, report: reset(fixture).baseline });
     }
 
-    const { state, report } = current(fixture);
+    // Each action scans at most once: replay, generate, and report read the current copy, and
+    // apply scans only the patched copy, then shares that scan with verification.
+    const state = current(fixture);
 
     if (route === "/api/replay") {
       if (typeof payload.scenarioId !== "string") throw new EngineError("INVALID_SCENARIO", "Choose a known replay scenario.");
-      const replay = replayScenario(report, payload.scenarioId);
+      const replay = replayScenario(scanFiles(state.files), payload.scenarioId);
       if (!replay.ok) throw new EngineError(replay.error.code, "Replay scenario not found.");
       return respond({ replay: replay.value });
     }
 
     if (route === "/api/patch/generate") {
+      const report = scanFiles(state.files);
       const finding = report.findings.find((item) => item.id === payload.findingId);
       if (finding === undefined) throw new EngineError("FINDING_NOT_FOUND", "The selected finding is not in the current scan.");
-      const patch = generatePatchForFiles(state.files, finding);
+      const patch = generatePatchForFiles(state.files, finding, report);
       if (!patch.ok) throw new EngineError(patch.error.code, "A safe automatic patch is not available for this finding.");
       state.patches.set(patch.value.id, patch.value);
       return respond({ patch: patch.value });
@@ -116,7 +118,8 @@ export function createEngine(bundle: FixtureBundle): Engine {
       const applied = applyPatchToFiles(state.files, patch);
       if (!applied.ok) throw new EngineError(applied.error.code, "The patch could not be applied to the isolated copy.");
       state.files = applied.value.files;
-      const verification = verifyPatchFiles(state.files, patch);
+      const after = scanFiles(state.files);
+      const verification = verifyPatchFiles(state.files, patch, after);
       if (!verification.ok) throw new EngineError(verification.error.code, "The patched copy could not be verified.");
       if (applied.value.applied) {
         state.applied.push({
@@ -129,7 +132,6 @@ export function createEngine(bundle: FixtureBundle): Engine {
           ...(verification.value.replay === undefined ? {} : { replayResult: verification.value.replay.result }),
         });
       }
-      const after = scanFiles(state.files);
       return respond({
         applied: { applied: applied.value.applied, patch },
         verification: verification.value,
@@ -139,7 +141,7 @@ export function createEngine(bundle: FixtureBundle): Engine {
     }
 
     if (route === "/api/report") {
-      const markdown = buildMarkdownReport({ fixture, baseline: state.baseline, current: report, patches: state.applied });
+      const markdown = buildMarkdownReport({ fixture, baseline: state.baseline, current: scanFiles(state.files), patches: state.applied });
       return respond({ filename: `gravescan-${fixture}.md`, markdown });
     }
 

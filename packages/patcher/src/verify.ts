@@ -1,13 +1,14 @@
 import type { FixtureFile, Result } from "@gravescan/fixtures/browser";
-import { scanFiles } from "@gravescan/scanner/browser";
+import { scanFiles, type ScanResult } from "@gravescan/scanner/browser";
 import { replayScenario } from "@gravescan/simulator";
 import type { Patch, PatchError, PatchVerification } from "./schemas.ts";
 
+/** `scan` must be the scan of the patched `files`; pass it in when the caller already has it. */
 export function verifyPatchFiles(
   files: readonly FixtureFile[],
   patch: Patch,
+  scan: ScanResult = scanFiles(files),
 ): Result<PatchVerification, PatchError> {
-  const scan = scanFiles(files);
   const highCriticalAfter = scan.findings.filter((finding) => finding.severity === "high" || finding.severity === "critical").length;
   // Finding IDs carry line numbers, so a reformat changes them. A real fix must lower the rule's count in the file.
   const ruleCountAfter = scan.findings.filter((finding) => finding.ruleId === patch.ruleId && finding.file === patch.findingFile).length;
