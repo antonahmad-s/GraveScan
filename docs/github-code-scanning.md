@@ -43,7 +43,7 @@ jobs:
         working-directory: .gravescan-tool
       - name: Scan .kiro/
         run: node .gravescan-tool/packages/cli/src/main.ts scan --path . --format sarif > gravescan.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gravescan.sarif
           category: gravescan

@@ -29,9 +29,12 @@ jobs:
       - run: corepack prepare pnpm@10.26.0 --activate
       - run: pnpm install --frozen-lockfile
       - name: Scan this repository's Kiro configuration
-        run: pnpm gravescan self-scan --format sarif > gravescan.sarif
+        # Call Node directly: pnpm's script banner would corrupt the JSON SARIF redirect.
+        run: node packages/cli/src/main.ts self-scan --format sarif > gravescan.sarif
+      - name: Validate the generated SARIF is JSON
+        run: node -e 'JSON.parse(require("node:fs").readFileSync("gravescan.sarif", "utf8"))'
       - name: Upload Code Scanning results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gravescan.sarif
           category: gravescan
