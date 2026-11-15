@@ -9,4 +9,7 @@ Design Read: security workbench for developers and technical judges, forensic in
 - **Evidence rail marker:** it connects a finding to replay and patch actions, making the product's evidence trail visible without invented decoration.
 - **Low motion:** short state transitions help track replay and verification changes; no animation competes with forensic reading.
 - **Text wordmark only:** no logo asset was commissioned or supplied, so the title is typography rather than a fabricated brand asset.
+- **"Your project" below the fixtures, not in a separate screen:** a real project follows the same scan, replay, and patch steps, so it joins the same rail and becomes one more case in the list.
+- **Native `<details>` for pasting:** pasting is the secondary path, so it stays collapsed behind a labelled disclosure with its native marker instead of adding a second always-visible form.
+- **Monospace paste box:** pasted JSON is source text, matching the evidence and diff blocks.
 - **No dashboard metrics:** the UI presents actual scanner output rather than unsupported security or performance claims.
