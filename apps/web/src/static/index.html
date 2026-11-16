@@ -26,8 +26,7 @@
     <a class="skip-link" href="#workbench">Skip to workspace</a>
     <header class="topbar">
       <div class="shell topbar-inner">
-        <p class="brand"><img src="/icon0.svg" width="30" height="30" alt=""><span>GraveScan</span></p>
-        <p class="topbar-context">Browser-local evidence review</p>
+        <p class="brand"><img src="/icon0.svg" width="28" height="28" alt=""><span>GraveScan</span></p>
         <p id="status-line" class="status-line" role="status" aria-live="polite">Loading the scanner in this tab.</p>
         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
           <svg aria-hidden="true" focusable="false" viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="7.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5z" fill="currentColor"/></svg>
@@ -37,121 +36,108 @@
     </header>
 
     <main>
-      <section class="masthead" aria-labelledby="page-title">
-        <div class="shell">
-          <div class="masthead-grid">
-            <div class="masthead-copy">
-              <p class="eyebrow">Browser-local analysis <span>Evidence before configuration changes</span></p>
-              <h1 id="page-title" class="headline">Inspect the boundary before an agent <em>crosses it.</em></h1>
-              <p class="lede">GraveScan reads Kiro settings, hooks, agents, and steering files with deterministic rules. It can replay an available risk safely, propose an allowlisted patch, and verify the isolated copy.</p>
-              <p class="safety-notice">Safe simulation. No arbitrary code or network request is executed.</p>
-              <ol class="masthead-steps" aria-label="GraveScan process">
-                <li><strong>Read</strong><span>Evidence names the file and line behind a rule match.</span></li>
-                <li><strong>Replay</strong><span>Available risky capabilities are tested through a bounded simulation.</span></li>
-                <li><strong>Verify</strong><span>An isolated patch must survive another scan and replay.</span></li>
-              </ol>
-            </div>
-            <div class="masthead-visual" aria-hidden="true">
-              <div class="visual-field">
-                <div class="visual-aperture"><img src="/icon0.svg" width="320" height="320" fetchpriority="high" alt=""></div>
-              </div>
-              <div class="visual-base"><span>Runs in this tab</span><span>Nothing is uploaded</span></div>
-            </div>
+      <section class="intro" aria-labelledby="page-title">
+        <div class="shell intro-grid">
+          <div class="intro-copy">
+            <h1 id="page-title" class="headline">Inspect Kiro configuration before an agent can cross a risky boundary.</h1>
+            <p class="lede">GraveScan checks the settings, hooks, agents, and steering files in your <code>.kiro</code> folder. Files are read in this browser tab and are never uploaded.</p>
+            <ol class="process" aria-label="What you can do with GraveScan">
+              <li><strong>Scan a project</strong><span>Deterministic rules read your .kiro files.</span></li>
+              <li><strong>Inspect evidence</strong><span>Every finding names its file and line.</span></li>
+              <li><strong>Replay a risk safely</strong><span>A bounded simulation runs no project code.</span></li>
+              <li><strong>Review and verify a patch</strong><span>An isolated copy is scanned and replayed again.</span></li>
+            </ol>
+            <p class="safety-notice">Safe simulation. No arbitrary code or network request is executed.</p>
+          </div>
+          <div class="intro-visual" aria-hidden="true">
+            <div class="aperture"><img src="/icon0.svg" width="160" height="160" fetchpriority="high" alt=""></div>
           </div>
         </div>
       </section>
 
       <div id="workbench" class="workbench" aria-busy="false">
-        <section class="case-picker" aria-labelledby="source-heading">
+        <section class="source-stage" aria-labelledby="source-heading">
           <div class="shell">
-            <div class="stage-panel picker-grid">
-              <header class="section-head picker-head">
-                <span class="index" aria-hidden="true">01</span>
-                <div>
-                  <h2 id="source-heading">Start with your project</h2>
-                  <p class="section-note">Select a project folder to inspect its Kiro configuration in this browser tab. Controlled examples remain available below.</p>
-                </div>
-              </header>
-
-              <section class="local-project" aria-labelledby="local-heading">
-                <div class="local-copy">
-                  <p class="local-kicker">Primary workflow</p>
-                  <h3 id="local-heading">Scan your .kiro configuration</h3>
+            <div class="source-panel">
+              <h2 id="source-heading">Choose what to scan</h2>
+              <div class="source-grid">
+                <section class="local-project" aria-labelledby="local-heading">
+                  <h3 id="local-heading">Your project</h3>
+                  <p class="local-lead">Choose your project folder or its <code>.kiro</code> folder. GraveScan reads supported text files only. It does not upload files, run project code, or write to your repository.</p>
                   <div class="primary-project-action">
-                    <button id="folder-button" class="primary-button" type="button" disabled>Choose project folder</button>
+                    <button id="folder-button" class="primary-button folder-button" type="button" aria-describedby="local-summary" disabled>Choose project folder</button>
                     <input id="folder-input" type="file" webkitdirectory multiple hidden>
                   </div>
-                  <p class="muted">GraveScan reads supported text files only. It does not upload files, run project code, or write to your repository.</p>
+                  <p id="local-summary" class="notice" hidden></p>
+                  <div id="loaded-project-source" class="loaded-project-source" hidden>
+                    <button id="local-project-button" class="source-option" type="button" data-fixture="local-project" aria-pressed="false" disabled>
+                      <span class="option-marker" aria-hidden="true"></span>
+                      <span class="option-body"><strong>Your project</strong><span class="fixture-note"></span><code>local-project</code></span>
+                      <span class="option-selected" aria-hidden="true">Selected</span>
+                    </button>
+                  </div>
                   <ul class="scope-list" aria-label="Local project scan limits">
-                    <li>JSON, Markdown, YAML, and text files in the shallowest <code>.kiro/</code> folder</li>
+                    <li>Reads .json, .md, .yaml, .yml, and .txt files in the shallowest <code>.kiro/</code> folder</li>
                     <li>Up to 500 files, 1 MiB each, and 5 MiB in total</li>
                     <li>Secret-like values are redacted before evidence, diffs, and reports are shown</li>
                   </ul>
-                </div>
-                <div class="local-controls">
                   <details class="paste-box">
                     <summary>Or paste an mcp.json file</summary>
                     <div class="paste-body">
                       <label class="paste-label" for="paste-input">mcp.json content</label>
-                      <textarea id="paste-input" rows="7" spellcheck="false" autocomplete="off"></textarea>
+                      <textarea id="paste-input" rows="7" spellcheck="false" autocomplete="off" aria-describedby="paste-error paste-hint"></textarea>
+                      <p id="paste-error" class="notice" hidden></p>
+                      <p id="paste-hint" class="paste-hint">Scanned in this tab when you choose Scan pasted mcp.json. The field clears once the file is accepted.</p>
                       <button id="paste-button" class="quiet-button" type="button" disabled>Scan pasted mcp.json</button>
                     </div>
                   </details>
-                  <p id="local-summary" class="inline-notice muted" role="status" aria-live="polite" hidden></p>
-                  <div id="loaded-project-source" class="loaded-project-source" hidden>
-                    <p class="loaded-source-label">Loaded in this tab</p>
-                    <button id="local-project-button" class="loaded-source-button" type="button" data-fixture="local-project" aria-pressed="false" disabled>
-                      <strong>Your project</strong><span class="fixture-note"></span><code>local-project</code>
-                    </button>
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              <section class="fixture-examples" aria-labelledby="fixture-heading">
-                <header class="subsection-head">
-                  <div>
-                    <p class="local-kicker">Controlled examples</p>
-                    <h3 id="fixture-heading">Try an example case</h3>
-                    <p class="muted">These fixtures model known configuration risks and use fake tokens only.</p>
+                <section class="fixture-examples" aria-labelledby="fixture-heading">
+                  <h3 id="fixture-heading">Controlled examples</h3>
+                  <p class="examples-note">Known risky setups that use fake tokens only. Pick one to see the full workflow.</p>
+                  <div id="fixture-list" class="fixture-list" role="group" aria-label="Controlled example cases">
+                    <button class="source-option fixture-button" type="button" data-fixture="steering-injection" aria-pressed="false" disabled><span class="option-marker" aria-hidden="true"></span><span class="option-body"><strong>Steering injection</strong><span class="fixture-note">A steering file tells the agent to print secrets and reach outside the workspace.</span><code>steering-injection</code></span><span class="option-selected" aria-hidden="true">Selected</span></button>
+                    <button class="source-option fixture-button" type="button" data-fixture="unbounded-hook" aria-pressed="false" disabled><span class="option-marker" aria-hidden="true"></span><span class="option-body"><strong>Unbounded hook</strong><span class="fixture-note">A save hook runs the file path as a command, with no allowlist.</span><code>unbounded-hook</code></span><span class="option-selected" aria-hidden="true">Selected</span></button>
+                    <button class="source-option fixture-button" type="button" data-fixture="unsafe-mcp" aria-pressed="false" disabled><span class="option-marker" aria-hidden="true"></span><span class="option-body"><strong>Unsafe MCP</strong><span class="fixture-note">A shell-capable MCP tool is auto-approved and has no tool allowlist.</span><code>unsafe-mcp</code></span><span class="option-selected" aria-hidden="true">Selected</span></button>
                   </div>
-                </header>
-                <div id="fixture-list" class="fixture-list" role="group" aria-label="Controlled example cases">
-                  <button class="fixture-button" type="button" data-fixture="steering-injection" aria-pressed="false" disabled><strong>Steering injection</strong><span class="fixture-note">A steering file tells the agent to print secrets and reach outside the workspace.</span><code>steering-injection</code></button>
-                  <button class="fixture-button" type="button" data-fixture="unbounded-hook" aria-pressed="false" disabled><strong>Unbounded hook</strong><span class="fixture-note">A save hook runs the file path as a command, with no allowlist.</span><code>unbounded-hook</code></button>
-                  <button class="fixture-button" type="button" data-fixture="unsafe-mcp" aria-pressed="false" disabled><strong>Unsafe MCP</strong><span class="fixture-note">A shell-capable MCP tool is auto-approved and has no tool allowlist.</span><code>unsafe-mcp</code></button>
-                </div>
-              </section>
-
-              <div class="case-actions" aria-label="Selected source actions">
-                <button id="scan-button" class="primary-button" type="button" disabled>Run selected scan</button>
-                <button id="reset-button" class="quiet-button" type="button" disabled>Reset isolated copy</button>
-                <p id="source-action-status" class="inline-notice" role="status" aria-live="polite" hidden></p>
+                </section>
               </div>
-              <p id="source-stage-summary" class="source-stage-summary" role="status" aria-live="polite">Choose a project folder or controlled example to begin.</p>
+
+              <div class="source-bar" role="group" aria-labelledby="source-bar-label">
+                <div class="source-bar-copy">
+                  <p id="source-bar-label" class="source-bar-label">Selected source</p>
+                  <p id="source-stage-summary" class="source-stage-summary">None yet. Choose a project folder or a controlled example.</p>
+                </div>
+                <div class="source-actions">
+                  <button id="scan-button" class="quiet-button" type="button" disabled>Scan selected source</button>
+                  <button id="reset-button" class="quiet-button" type="button" disabled>Reset isolated copy</button>
+                </div>
+                <p id="source-action-status" class="notice" hidden></p>
+              </div>
             </div>
           </div>
         </section>
 
         <section class="review-stage" aria-label="Review findings">
-          <div class="shell">
-            <div class="stage-panel board-grid">
-              <section class="evidence-board" aria-labelledby="evidence-heading">
-                <header class="section-head board-head">
-                  <span class="index" aria-hidden="true">02</span>
-                  <div><h2 id="evidence-heading">Findings</h2><p class="section-note">Use the evidence to decide what to change next.</p></div>
-                  <button id="export-button" class="quiet-button" type="button" disabled>Export Markdown</button>
-                </header>
-                <p id="report-action-status" class="inline-notice report-action-status" role="status" aria-live="polite" hidden></p>
-                <div id="triage-context" class="triage-context">
-                  <strong id="source-name">Choose a source</strong>
-                  <span id="source-boundary">Browser-local analysis. No upload.</span>
-                </div>
-                <div id="scan-summary" class="scan-summary" hidden></div>
-                <details id="diagnostics-disclosure" class="diagnostics-disclosure" hidden>
-                  <summary id="diagnostics-summary">Parse diagnostics</summary>
-                  <p class="diagnostics-note">Diagnostics identify input that could not be fully parsed. They are not security findings.</p>
-                  <ol id="diagnostics-list" class="diagnostics-list" aria-label="Parse diagnostics"></ol>
-                </details>
+          <div class="shell review-grid">
+            <section class="evidence-board" aria-labelledby="evidence-heading">
+              <header class="board-head">
+                <h2 id="evidence-heading" tabindex="-1">Findings</h2>
+                <button id="export-button" class="quiet-button" type="button" disabled>Export Markdown</button>
+              </header>
+              <p id="report-action-status" class="notice report-action-status" hidden></p>
+              <div id="triage-context" class="triage-context" hidden>
+                <strong id="source-name">Choose a source</strong>
+                <span id="source-boundary">Browser-local analysis. No upload.</span>
+              </div>
+              <div id="scan-summary" class="scan-summary" hidden></div>
+              <details id="diagnostics-disclosure" class="diagnostics-disclosure" hidden>
+                <summary id="diagnostics-summary">Parse diagnostics</summary>
+                <p class="diagnostics-note">Diagnostics identify input that could not be fully parsed. They are not security findings.</p>
+                <ol id="diagnostics-list" class="diagnostics-list" aria-label="Parse diagnostics"></ol>
+              </details>
+              <div id="filter-panel" class="filter-panel" hidden>
                 <div class="filters" role="group" aria-labelledby="filter-heading">
                   <p id="filter-heading" class="filter-heading">Filter findings</p>
                   <label class="field"><span>Severity</span>
@@ -168,31 +154,31 @@
                   </label>
                 </div>
                 <div class="filter-feedback">
-                  <p id="filter-summary" class="filter-summary" role="status" aria-live="polite" hidden></p>
+                  <p id="filter-summary" class="filter-summary" role="status" aria-live="polite"></p>
                   <button id="clear-filters-button" class="text-button" type="button" hidden>Clear filters</button>
                 </div>
-                <div id="finding-state" class="state-panel" role="status" aria-live="polite">Choose a project folder or example, then run a scan.</div>
-                <ol id="finding-list" class="finding-list" aria-label="Scan findings"></ol>
-              </section>
+              </div>
+              <p id="finding-state" class="state-panel">Choose a project folder or example, then run a scan.</p>
+              <ol id="finding-list" class="finding-list" aria-label="Scan findings"></ol>
+            </section>
 
-              <section class="case-file" aria-labelledby="case-heading">
-                <header class="section-head">
-                  <span class="index" aria-hidden="true">03</span>
-                  <div><h2 id="case-heading">Case file</h2><p class="section-note">Follow the current evidence from first signal to isolated verification.</p></div>
-                </header>
-                <p id="detail-action-status" class="inline-notice detail-action-status" role="status" aria-live="polite" hidden></p>
-                <div id="detail-state" class="detail-empty">
-                  <p class="detail-empty-lead">Choose a finding to inspect its evidence trail.</p>
-                  <ol class="trail-legend" aria-label="Evidence trail stages">
-                    <li><strong>Scan</strong><span>Rules read the selected .kiro files and point to the evidence behind each finding.</span></li>
-                    <li><strong>Replay</strong><span>Available scenarios test a risky capability without running project code.</span></li>
-                    <li><strong>Patch</strong><span>An allowlisted edit is proposed as a diff for review.</span></li>
-                    <li><strong>Verify</strong><span>The patch goes into an isolated copy, which is scanned and replayed again.</span></li>
-                  </ol>
-                </div>
-                <article id="finding-detail" class="finding-detail"></article>
-              </section>
-            </div>
+            <section class="case-file" aria-labelledby="case-heading">
+              <header class="case-file-head">
+                <h2 id="case-heading">Case file</h2>
+                <button id="back-button" class="text-button back-button" type="button" hidden>Back to findings</button>
+              </header>
+              <div id="detail-state" class="detail-empty">
+                <p id="detail-empty-lead" class="detail-empty-lead">No finding selected yet.</p>
+                <p id="detail-empty-note" class="detail-empty-note">Scan a source, then choose a finding to follow it through each stage.</p>
+                <ol class="trail trail-preview" aria-label="Evidence trail stages">
+                  <li class="stage" data-tone="pending"><span class="stage-marker" aria-hidden="true">1</span><div class="stage-content"><p class="stage-heading">Scan</p><p class="stage-note">Rules point to the file and line behind each finding.</p></div></li>
+                  <li class="stage" data-tone="pending"><span class="stage-marker" aria-hidden="true">2</span><div class="stage-content"><p class="stage-heading">Replay</p><p class="stage-note">A bounded scenario tests the risky capability without running project code.</p></div></li>
+                  <li class="stage" data-tone="pending"><span class="stage-marker" aria-hidden="true">3</span><div class="stage-content"><p class="stage-heading">Patch</p><p class="stage-note">The allowlisted patcher proposes a minimal edit as a diff for review.</p></div></li>
+                  <li class="stage" data-tone="pending"><span class="stage-marker" aria-hidden="true">4</span><div class="stage-content"><p class="stage-heading">Verify</p><p class="stage-note">The patch goes into an isolated copy, which is scanned and replayed again.</p></div></li>
+                </ol>
+              </div>
+              <article id="finding-detail" class="finding-detail"></article>
+            </section>
           </div>
         </section>
       </div>
