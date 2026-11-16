@@ -8,7 +8,7 @@ Architectural security atelier with an editorial interface. ENERGY 3 / RHYTHM 3 
 - Large rounded display type for primary headings and risk counts. System sans for interface text. Monospace only for evidence, diffs, pasted config, and machine identifiers.
 - Identity motif: a circular scan aperture in the masthead and an evidence trail linking scan, replay, patch, and verify.
 - Dark mode default for evidence and diff reading; light mode is a real inverted reading surface, not a recolored dark mode.
-- Animate only state changes: the aperture and its orbit settle on page load, findings arrive after a scan, replay steps and verification status arrive in order. Nothing loops. Respect `prefers-reduced-motion`.
+- Animate only state changes: findings arrive after a scan, replay steps and verification status arrive in order. Nothing loops. Respect `prefers-reduced-motion`.
 - Severity and status always have a text label, not color alone. Meet WCAG AA contrast.
 - Every control is keyboard accessible with a visible focus state.
 - No decorative buttons: every button has real behavior.

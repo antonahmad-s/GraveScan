@@ -8,7 +8,7 @@ Design Read: security workbench for developers and technical judges, in an archi
 - **Dark ink, mineral paper, warm stone:** the three structural surfaces create hierarchy before decorative treatment. Ink holds active work, paper holds long-form inspection, and stone marks the source-selection phase.
 - **Plum scan line:** this comes from the logo. It marks an active evidence trail, an active case, and the aperture line. It does not style every control.
 - **Red and green keep their meaning:** red is severity and danger only. Green is a replay blocked or patch verified only.
-- **Orbital aperture:** two hairline orbits, a tombstone-shaped aperture, and two fixed dots make scanning visible without using stock imagery or a generic dashboard graph.
+- **Aperture with one ring:** a tombstone-shaped aperture inside a single hairline ring makes scanning visible without stock imagery. The earlier orbits, dots, and the "Local examination 01 / 10" label were removed on 2026-11-16: they overflowed the panel and implied a sequence the product does not have.
 
 ## Typography
 
@@ -19,12 +19,14 @@ Design Read: security workbench for developers and technical judges, in an archi
 
 ## Layout
 
-- **Split masthead:** the product explanation lives on mineral paper while the aperture sits on ink. The contrast separates the promise from the working data without adding a generic marketing screen.
-- **Large headline, compact process:** the headline establishes the visual hierarchy; Read, Replay, and Verify remain a short factual explanation of the actual engine flow.
+- **Framed masthead, sized to content:** the product explanation sits on mineral paper and the mark on a narrower ink column, inside one rounded panel on the canvas. The panel has no minimum height, so the case picker starts within the first screen: at 1440x900 it moved from y=1251 to y=624, and at 390x844 from y=1032 to y=552.
+- **Headline in three lines:** the headline is capped at 4.35rem with gentle tracking, so it reads in three lines on a laptop instead of five. Read, Replay, and Verify remain a short factual explanation of the actual engine flow.
+- **One container, one panel rhythm:** the masthead, case picker, and review all sit in the same 1320px container as framed panels with the same gap and radius. Previously each stage was full bleed with its own padding, and the masthead's gutter showed an ink strip on the left.
 - **Warm case-selection field:** cases are a distinct source-selection decision, so they sit on stone rather than another dark card grid.
 - **Dark review field and contrasting case file:** the findings queue remains dark and dense; the selected case becomes a paper reading surface. The inverse happens in light mode, so both themes retain a focal case file.
 - **Asymmetric wide layout:** at 920px, the findings queue stays beside a wider case file and may scroll within the viewport. Below that, the page stacks in the user's task order.
-- **Content breakpoints:** case cards split at 640px, the masthead and review split at 920px, and the project panel moves beside the cases at 1200px.
+- **Content breakpoints:** case cards split at 600px, the masthead shows the mark at 720px, the queue moves beside the case file at 920px, and the project panel moves beside the cases at 1200px. Below 720px the mark is hidden, because the header already shows it and the explanation matters more on a phone.
+- **Filters as a grid:** the two filters share one row in a two-column grid at every width, instead of wrapping into an uneven stack on phones.
 
 ## Interaction
 
@@ -37,7 +39,7 @@ Design Read: security workbench for developers and technical judges, in an archi
 
 ## Motion
 
-- **One-time orientation:** the aperture and two orbits settle into place on load. They do not loop.
+- **No load animation:** the masthead is static. Motion is reserved for changes the visitor caused.
 - **State feedback:** scan findings rise in after a real result, replay steps come in sequence, and the final verification status settles in. These movements make a changed state easier to locate.
 - **Reduced motion:** all nonessential motion lives inside `prefers-reduced-motion: no-preference`.
 

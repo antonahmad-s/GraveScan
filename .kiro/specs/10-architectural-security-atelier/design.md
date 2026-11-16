@@ -13,9 +13,9 @@ The sticky header stays small and functional: local tombstone logo, product name
 
 ### Masthead
 
-The masthead splits into mineral paper and ink fields at 920px. The paper half holds a large sentence describing what the tool actually does, an explanatory paragraph, and three factual process labels. The ink half contains a local SVG tombstone mark inside a CSS-built circular aperture, with two static orbits and a stone base. The visual depicts inspection and the product's own identity; it does not create a fictional product scene.
+The masthead is one framed panel, sized to its content. From 720px it splits into a wide mineral-paper field and a narrower ink column. The paper field holds a sentence describing what the tool actually does, an explanatory paragraph, and three factual process labels. The ink column contains the local SVG tombstone mark inside a CSS-built aperture with one ring, and a stone base stating that the scan runs in the tab. Below 720px the ink column is hidden, because the header already shows the mark.
 
-On narrow screens the explanatory field comes before the visual, then the case picker, so the reading and tab order match the user journey.
+Every stage (masthead, case picker, review) sits in the same 1320px container as a framed panel with the same gap and radius, so the page reads as one aligned system at every width.
 
 ### Source selection
 
@@ -39,7 +39,7 @@ A paper-context red and green are used on mineral paper. Brighter ink-context re
 
 ## Motion
 
-The masthead orbits and aperture settle once during the initial render. New findings, replay trace steps, and the verification status arrive in sequence only after a real state change. No animation loops. All animation is inside `prefers-reduced-motion: no-preference`.
+The masthead is static. New findings, replay trace steps, and the verification status arrive in sequence only after a real state change. No animation loops. All animation is inside `prefers-reduced-motion: no-preference`.
 
 ## Scope
 

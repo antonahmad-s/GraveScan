@@ -38,34 +38,32 @@
 
     <main>
       <section class="masthead" aria-labelledby="page-title">
-        <div class="shell masthead-grid">
-          <div class="masthead-copy">
-            <p class="eyebrow">GraveScan <span>Browser-local security workbench</span></p>
-            <h1 id="page-title" class="headline">See what your agents <em>can reach.</em> Verify the fix.</h1>
-            <p class="lede">GraveScan reads Kiro settings, hooks, agents, and steering files with ten deterministic rules. It replays the risk behind a finding in a safe simulation, patches an isolated copy, and scans that copy again.</p>
-            <ol class="masthead-steps" aria-label="GraveScan process">
-              <li><strong>Read</strong><span>Evidence points to the file and line.</span></li>
-              <li><strong>Replay</strong><span>The risky capability is tested safely.</span></li>
-              <li><strong>Verify</strong><span>An isolated patch must survive another scan.</span></li>
-            </ol>
-          </div>
-          <div class="masthead-visual" aria-hidden="true">
-            <div class="visual-topline"><span>Local examination</span><span>01 / 10</span></div>
-            <div class="visual-field">
-              <span class="visual-orbit orbit-one"></span>
-              <span class="visual-orbit orbit-two"></span>
-              <span class="visual-star star-one"></span>
-              <span class="visual-star star-two"></span>
-              <div class="visual-aperture"><img src="/icon0.svg" width="320" height="320" fetchpriority="high" alt=""></div>
+        <div class="shell">
+          <div class="masthead-grid">
+            <div class="masthead-copy">
+              <p class="eyebrow">GraveScan <span>Browser-local security workbench</span></p>
+              <h1 id="page-title" class="headline">See what your agents <em>can reach.</em> Verify the fix.</h1>
+              <p class="lede">GraveScan reads Kiro settings, hooks, agents, and steering files with ten deterministic rules. It replays the risk behind a finding in a safe simulation, patches an isolated copy, and scans that copy again.</p>
+              <ol class="masthead-steps" aria-label="GraveScan process">
+                <li><strong>Read</strong><span>Evidence points to the file and line.</span></li>
+                <li><strong>Replay</strong><span>The risky capability is tested safely.</span></li>
+                <li><strong>Verify</strong><span>An isolated patch must survive another scan.</span></li>
+              </ol>
             </div>
-            <div class="visual-base"><span>Controlled fixture</span><span>Nothing leaves this tab</span></div>
+            <div class="masthead-visual" aria-hidden="true">
+              <div class="visual-field">
+                <div class="visual-aperture"><img src="/icon0.svg" width="320" height="320" fetchpriority="high" alt=""></div>
+              </div>
+              <div class="visual-base"><span>Runs in this tab</span><span>Nothing is uploaded</span></div>
+            </div>
           </div>
         </div>
       </section>
 
       <div id="workbench" class="workbench" aria-busy="false">
         <section class="case-picker" aria-labelledby="fixture-heading">
-          <div class="shell picker-grid">
+          <div class="shell">
+          <div class="stage-panel picker-grid">
             <header class="section-head picker-head">
               <span class="index" aria-hidden="true">01</span>
               <div>
@@ -105,10 +103,12 @@
               </div>
             </section>
           </div>
+          </div>
         </section>
 
         <section class="review-stage" aria-label="Review findings">
-          <div class="shell board-grid">
+          <div class="shell">
+          <div class="stage-panel board-grid">
             <section class="evidence-board" aria-labelledby="evidence-heading">
               <header class="section-head board-head">
                 <span class="index" aria-hidden="true">02</span>
@@ -154,6 +154,7 @@
               </div>
               <article id="finding-detail" class="finding-detail" aria-live="polite"></article>
             </section>
+          </div>
           </div>
         </section>
       </div>
