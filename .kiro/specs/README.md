@@ -15,5 +15,6 @@ Each spec follows Requirements, then Design, then Tasks.
 | 09 | editorial-workbench-and-icons | redesigned responsive workbench, evidence trail, inline errors, owner's logo as favicon and app icon |
 | 10 | architectural-security-atelier | owner-reference-inspired ink, mineral paper, and stone interface with scanning aperture and responsive review field |
 | 11 | production-workbench-redesign | proposed production-first source flow, inspectable diagnostics, workflow clarity, and responsive/accessibility hardening |
+| 12 | calm-review-workbench | calmer first screen, explicit folder-then-scan flow, stage-based case file, focus that follows each result, ENERGY 2 / RHYTHM 2 / MOTION 1 |
 
-Specs 01 through 10 are implemented and verified with `pnpm verify` (ESLint, tsc, Vitest with fast-check), `pnpm test:e2e` (Playwright), and `pnpm self-scan`. Spec 11 is implemented with automated release validation complete; its remaining manual accessibility and zoom checks are listed in the spec and `docs/ui-delivery-gate.md`.
+Specs 01 through 10 are implemented and verified with `pnpm verify` (ESLint, tsc, Vitest with fast-check), `pnpm test:e2e` (Playwright), and `pnpm self-scan`. Specs 11 and 12 are implemented with automated release validation complete; their remaining manual accessibility and zoom checks are listed in each spec and in `docs/ui-delivery-gate.md`.
