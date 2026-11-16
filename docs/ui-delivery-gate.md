@@ -17,7 +17,7 @@ Antislop mode: during (project steering). Dial: ENERGY 2 / RHYTHM 2 / MOTION 1. 
   - Unsafe MCP example: Space selects it and "Run example scan" becomes the primary button.
   - "Run example scan": the scan completes and focus moves to the Findings heading.
   - GRAVE-001: Enter selects it, the case file scrolls into view, and focus moves to the case title.
-  - Shift+Tab from the case title reaches "Back to findings"; Enter returns focus to the selected finding.
+  - Shift+Tab from the case title reaches "Back to findings"; Enter returns focus to the selected finding. Mouse and touch: the link is visible at 390 by 844 and 1280 by 600, and a click from the bottom of the page brings the selected finding back into view with focus. At 1440 by 900 the sticky queue keeps another finding in view and clickable with the page scrolled to the bottom.
   - "Run safe replay": focus moves to "Replay: exposed".
   - "Propose safe patch": focus moves to "Patch: ready to review". Tab reaches the diff region, then "Apply to isolated copy".
   - "Apply to isolated copy": focus moves to "Verify: passed" and the badge reads "Simulation blocked".
@@ -49,11 +49,20 @@ Antislop mode: during (project steering). Dial: ENERGY 2 / RHYTHM 2 / MOTION 1. 
 
 ### Automated checks
 
-- `pnpm lint`, `pnpm typecheck`: PASS.
+- `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`: PASS.
 - `pnpm test`: PASS, 28 files and 250 tests.
-- `pnpm build`: PASS. Page script 22,452 bytes (budget 25 KiB), Worker 92,022 bytes (budget 125 KiB), stylesheet 31,672 bytes, fixtures 2,598 bytes.
-- `pnpm test:e2e`: PASS, 30 Chromium tests.
+- `pnpm build`: PASS. Page script 22,820 bytes (budget 25 KiB), Worker 92,022 bytes (budget 125 KiB), stylesheet 31,768 bytes, fixtures 2,598 bytes.
+- `pnpm test:e2e`: PASS, 31 Chromium tests.
 - `pnpm docs:check`, `pnpm repo:check`, `pnpm self-scan` (0 findings): PASS.
+
+### Final validation after owner review
+
+- **Functional integrity:** PASS. The 31 browser tests cover folder scan, paste scan, filters, diagnostics, evidence, replay, patch, isolated verification, Markdown export, reset, theme, reload clearing, Worker failure, per-tab isolation, and the new mouse and touch return path. CLI `list`, JSON and SARIF scans of all three fixtures, JSON and SARIF `--path` scans, and the `--fail-on high` exit code (1) are byte-identical to `main`. SARIF reports version 2.1.0.
+- **Build change:** PASS. Only `apps/web/src/static/app.js` goes through the `format: "esm"` minification; the Worker is built by a separate `build()` call that did not change, and `worker.dfc3921264cf.js` is byte-identical to `main`. The page has always loaded `app.js` with `type="module"`, so its top-level names were already module-scoped. The minified script parses as a module, contains no import or export statement, starts a classic Worker from the hashed URL, and keeps the `es2022` target. `wrangler deploy --dry-run` completes.
+- **Security and privacy:** PASS. No file under `packages/` or the Worker sources changed. `_headers` (CSP, Trusted Types, `nosniff`, no-referrer, frame denial, COOP, CORP, Permissions Policy) is byte-identical to `main`. The page script's only network call is the same same-origin `fetch` of the fixture bundle as on `main`. Browser tests confirm same-origin requests only during the full flow and during a local folder scan, redacted secrets, DOM-only rendering of hostile markup, and `gravescan-theme` as the only stored key.
+- **Simulator contract:** PASS. `has exactly four bounded scenarios` and the emitted-scenario consistency test pass; the scenario catalog is unchanged.
+- **Accessibility after the final change:** PASS. After the full flow: `lang="en"`, one `h1`, no skipped heading levels across 17 headings, one `header`, `main`, and `footer`, no unnamed control, no image without `alt`, two live regions (header status and filter count), no `outline: none` rule. Keyboard audits at 1440 by 900, 1280 by 600, 1060 by 800, 768 by 1024, and 390 by 844, with and without reduced motion, found no focus target left under the header or out of view once scrolling settled.
+- **Light theme:** PASS. The `#f8f1eb` page raises muted text from 5.98:1 on the earlier `#e3d8cf` canvas to 7.48:1, and control edges from 4.24:1 to 5.31:1. The stone panel and ink case file keep the earlier balance of one warm and one dark block.
 
 ### Open checks
 

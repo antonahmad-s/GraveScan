@@ -12,6 +12,7 @@ Calm security evidence workbench with a clean editorial interface, a strong evid
 - Dark mode default for evidence and diff reading; light mode is a real inverted reading surface (paper page, ink case file), not a recolored dark mode.
 - Motion: color and border transitions on hover and selection, and smooth scrolling to a new result. All of it sits inside `prefers-reduced-motion: no-preference`. Nothing loops or enters on its own.
 - Focus follows results: selecting a finding focuses the case title; scan, replay, patch, and apply focus the region that holds the new result; filtering never moves focus.
+- Keyboard, mouse, and touch users each get a direct way back from the case file to the findings: a visible "Back to findings" link, or the sticky queue beside the case file where the layout allows it.
 - Severity, status, error, and selection always have a text label or shape, not color alone. Meet WCAG AA contrast and 3:1 for boundaries and focus.
 - Every control is keyboard accessible with a visible focus state and at least a 44px target.
 - No decorative buttons: every button has real behavior.
