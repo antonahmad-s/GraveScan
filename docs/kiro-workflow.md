@@ -7,7 +7,7 @@ Honest, evidence-based write-up. Fill each row as work happens; delete anything 
 | IDE / CLI / Web / Crew | IDE or Web for specs and code; CLI for scans and CI-like runs. Note real differences here. | _TODO_ |
 | Custom agents | `scanner-analyst`, `patch-engineer`, `release-reviewer` | `.kiro/agents/` |
 | Hooks | `PostTaskExec`: `pnpm verify` and `pnpm docs:check`. `PostFileSave` on scanner/simulator/fixtures: rule regression tests. `PostFileSave` on `.kiro/{settings,agents,hooks,steering}`: `pnpm self-scan`, which runs GraveScan's own rules against this repo. | `.kiro/hooks/` |
-| Spec-driven | Five specs. Compare against vibe coding on one module. | `.kiro/specs/` |
+| Spec-driven | Eleven specs. Specs 01 through 10 built the product; Spec 11 modernizes the production workbench with an approved preservation, evidence, privacy, and delivery gate. | `.kiro/specs/` |
 | Steering | Product contract, security boundaries, testing contract, UI direction | `.kiro/steering/` |
 | MCP | Custom `gravescan-dev` stdio server: `list_fixtures`, `run_fixture_scan`, `run_attack_replay`, `get_finding`, `generate_patch`, `verify_patch`. Disabled by default until a Kiro CLI user opts in. GitHub MCP optional. | `packages/mcp-dev/src/server.ts`, `.kiro/settings/mcp.json` |
 | PBT | fast-check: determinism, parser robustness, evidence validity, patch idempotence, no new high-risk finding | `tests/property/` |

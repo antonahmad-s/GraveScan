@@ -65,6 +65,15 @@ describe("static web build", () => {
     expect(source).not.toMatch(/\b(?:innerHTML|outerHTML|insertAdjacentHTML|document\.write)\b/);
   });
 
+  it("keeps worker failure handling and local data cleanup explicit", () => {
+    const source = readFileSync(path.join(root, "apps/web/src/static/app.js"), "utf8");
+    expect(source).toContain('worker.addEventListener("error"');
+    expect(source).toContain('worker.addEventListener("messageerror"');
+    expect(source).toContain("rejectPending(message)");
+    expect(source).toContain("URL.revokeObjectURL(url)");
+    expect(source).not.toMatch(/\b(?:indexedDB|sessionStorage)\b/);
+  });
+
   it("copies the icon set to the site root and every root link in the document resolves", () => {
     const index = readFileSync(path.join(dist, "index.html"), "utf8");
     for (const file of ["favicon.ico", "icon0.svg", "icon1.png", "apple-icon.png", "manifest.json", "web-app-manifest-192x192.png", "web-app-manifest-512x512.png"]) {

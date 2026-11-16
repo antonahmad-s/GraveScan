@@ -1,6 +1,6 @@
 import { listFixtures, loadFixture } from "@gravescan/fixtures";
 import { describe, expect, it } from "vitest";
-import { createWorkerHandler, type WorkerRequest } from "../src/worker-protocol.ts";
+import { createQueuedMessageHandler, createWorkerHandler, type WorkerRequest } from "../src/worker-protocol.ts";
 
 function bundle(): Record<string, unknown> {
   return Object.fromEntries(listFixtures().map((id) => {
@@ -68,5 +68,52 @@ describe("worker protocol", () => {
     const reply = await call({ type: "loadFolder", entries: [{ path: "repo/.kiro/a.md", file: exploding as unknown as Blob }] });
     expect(reply).toMatchObject({ ok: false });
     expect(reply.message).not.toContain("internal stack detail");
+  });
+
+  it("queues worker messages in arrival order without interleaving", async () => {
+    const started: number[] = [];
+    const replies: number[] = [];
+    let active = 0;
+    let peak = 0;
+    let releaseFirst: () => void = () => {};
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const enqueue = createQueuedMessageHandler(
+      async (request: number) => {
+        started.push(request);
+        active += 1;
+        peak = Math.max(peak, active);
+        if (request === 1) await firstGate;
+        active -= 1;
+        return request;
+      },
+      (reply) => replies.push(reply),
+    );
+
+    const first = enqueue(1);
+    const second = enqueue(2);
+    await Promise.resolve();
+    expect(started).toEqual([1]);
+    expect(replies).toEqual([]);
+
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(started).toEqual([1, 2]);
+    expect(replies).toEqual([1, 2]);
+    expect(peak).toBe(1);
+  });
+
+  it("continues queueing later requests after an unexpected handler failure", async () => {
+    const replies: number[] = [];
+    const enqueue = createQueuedMessageHandler(
+      async (request: number) => {
+        if (request === 1) throw new Error("unexpected");
+        return request;
+      },
+      (reply) => replies.push(reply),
+    );
+
+    await expect(enqueue(1)).rejects.toThrow("unexpected");
+    await expect(enqueue(2)).resolves.toBeUndefined();
+    expect(replies).toEqual([2]);
   });
 });

@@ -48,3 +48,33 @@ Design Read: security workbench for developers and technical judges, in an archi
 - **No new remote dependency:** the workbench remains a static site that makes same-origin requests only.
 - **Content-hashed engine assets:** JavaScript, CSS, and fixture data remain fingerprinted for immutable caching. The favicon and app icons remain fixed-name root files for browser and manifest discovery.
 - **Contrast:** text has a minimum checked ratio of 4.58:1 on the warm stone surface and higher elsewhere; component boundaries and focus states are 3:1 or higher.
+
+
+## Production workbench redesign, Spec 11
+
+### Source priority
+
+- **Local project first:** The folder picker is the primary source action. It sits directly below the local-project heading on narrow screens, so a 390px viewport exposes the action without a scroll. The three fixtures remain in a separate Controlled examples section with their original descriptions and fake-token boundary.
+- **Loaded project remains selectable:** A successful folder or pasted-config import creates a compact `Your project` selector inside the local panel. A visitor can return to the validated local source after inspecting an example without sending or re-reading its files.
+- **Paste data does not linger:** The `mcp.json` field clears only after the Worker accepts its text. Invalid input stays in place for correction.
+
+### Evidence and state
+
+- **Engine truth stays visible:** Finding fields, diagnostic fields, replay output, patch output, and verification output come from the active redacted Worker response. The page only groups, orders, counts, and labels those values. A finding removed by a verified patch is marked as Baseline scan evidence instead of being presented as current.
+- **Diagnostics are not findings:** Parse diagnostics appear in a native disclosure with their code, file, line, and message. The disclosure states that parsing diagnostics are not security findings.
+- **Static means static:** GRAVE-007 no longer advertises a replay scenario that the simulator does not support. The case file labels it Static evidence, removes replay and automatic-patch controls, and directs the user to the documented boundary.
+- **Action feedback stays near the action:** Source, report-export, and case-file actions each use a short local status. The global status is reserved for page-level progress and failure. The long case-file article is no longer a live region.
+
+### Responsive behavior
+
+- **Mobile begins with a real action:** The masthead keeps factual orientation, but its process descriptions collapse to labels below 600px. This protects the Read, Replay, Verify structure while making the folder action visible at 390px.
+- **Content breakpoints remain task-led:** The page stacks source, findings, and case file until the finding queue can sit beside the case file without trapping scroll. The examples return to a single right-side column at wide widths instead of becoming a second dense card grid.
+- **Long evidence is contained:** Paths, diagnostics, evidence, and diffs remain in wrapping or bounded scrolling regions. The page itself does not scroll horizontally.
+
+### Color, motion, and delivery
+
+- **The atelier surfaces remain structural:** Ink holds evidence, mineral paper holds explanatory and selected reading surfaces, and warm stone holds source selection. The local-first layout changes task order, not the product identity.
+- **Stone uses a darker plum label:** The primary-workflow and example labels use `#351b42` on warm stone, measured at 4.81:1. This replaces the previous near-threshold plum for normal text.
+- **Motion remains state feedback:** No new motion was added. Existing transition and result behavior stays inside `prefers-reduced-motion: no-preference`.
+- **Worker lifecycle stays honest:** Work remains serialized in the dedicated Worker. The page disables source actions and asks the visitor to reload after an unexpected Worker failure. It exposes no cancel control because the protocol has no safe partial-request cancellation or rollback state.
+- **The page script is minified at build time:** `scripts/build-web.ts` minifies the already-reviewed DOM renderer after replacing fixed asset URLs. This preserves the 25 KiB page-script budget without adding a runtime dependency.

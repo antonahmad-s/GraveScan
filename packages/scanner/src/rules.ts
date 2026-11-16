@@ -245,7 +245,6 @@ const rule007: RuleDefinition = {
               description: "The agent profile enables network-capable tools but provides no stated business reason.",
               remediation: "Remove the network capability or document the narrow business reason and allowed use.",
               confidence: "medium",
-              attackScenarioId: "AGENT-NETWORK-ESCALATION",
             }),
           ]
         : [],

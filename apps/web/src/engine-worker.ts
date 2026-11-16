@@ -1,4 +1,4 @@
-import { createWorkerHandler, type WorkerReply, type WorkerRequest } from "./worker-protocol.ts";
+import { createQueuedMessageHandler, createWorkerHandler, type WorkerReply, type WorkerRequest } from "./worker-protocol.ts";
 
 // Dedicated worker entry, bundled by `pnpm build` into /assets/worker.<hash>.js. Requests are
 // handled one at a time in arrival order, so engine state changes never interleave.
@@ -10,8 +10,8 @@ type WorkerScope = {
 
 const scope = globalThis as unknown as WorkerScope;
 const handle = createWorkerHandler();
-let queue: Promise<void> = Promise.resolve();
+const enqueue = createQueuedMessageHandler(handle, (reply) => scope.postMessage(reply));
 
 scope.onmessage = (event) => {
-  queue = queue.then(async () => scope.postMessage(await handle(event.data)));
+  void enqueue(event.data);
 };

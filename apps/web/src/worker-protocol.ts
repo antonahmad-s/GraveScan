@@ -19,6 +19,20 @@ export type WorkerReply =
 
 const GENERIC_ERROR = "The request could not be completed.";
 
+export function createQueuedMessageHandler<Request, Reply>(
+  handle: (request: Request) => Promise<Reply>,
+  emit: (reply: Reply) => void,
+): (request: Request) => Promise<void> {
+  let queue: Promise<void> = Promise.resolve();
+  return (request) => {
+    const task = queue.then(async () => {
+      emit(await handle(request));
+    });
+    queue = task.catch(() => undefined);
+    return task;
+  };
+}
+
 function isBundle(value: unknown): value is FixtureBundle {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
