@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation is complete as of 2026-11-16. Automated release validation and the final diff review passed. The manual 200 percent browser-zoom check, sticky-queue touch/scroll check, screen-reader smoke test, and owner acceptance remain open and are documented below.
+Implementation is complete as of 2026-11-16. Automated release validation and the final diff review passed. The manual 200 percent browser-zoom check, sticky-queue touch/scroll check, screen-reader smoke test, remain open and are documented below. Owner acceptance was received on 2026-11-16.
 
 ## Completion policy
 
@@ -515,10 +515,10 @@ After every phase, update this file with a short evidence note that names comman
   - **Requirements:** R1.10, R9, R10.7.
   - **Acceptance:** AC-10, AC-11, AC-13, AC-14.
 
-- [ ] **10.7 Request owner acceptance of the implemented redesign.**
+- [x] **10.7 Request owner acceptance of the implemented redesign.**
   - Present the final evidence, screenshots, performance results, security checks, and unresolved limitations.
   - Do not mark the redesign complete until the owner accepts the result.
-  - **Evidence:** explicit owner acceptance.
+  - **Evidence:** Owner replied "okee approved" on 2026-11-16 after reviewing PR #15. The manual zoom, sticky-queue touch/scroll, and screen-reader checks (tasks 7.3, 7.5, 8.3) remain open.
   - **Requirements:** R10.
   - **Acceptance:** AC-11.
 
@@ -544,4 +544,3 @@ After every phase, update this file with a short evidence note that names comman
 - **Task 7.3:** The 1024px full-flow layout passes, but the planned short-viewport sticky-queue and wheel/touch boundary check remains open.
 - **Task 7.5:** The 640 by 360 zoom-equivalent layout passed. A manual true 200 percent browser-zoom check remains open because headless Chromium does not apply browser-zoom keyboard shortcuts.
 - **Tasks 8.3 and 8.6:** A manual screen-reader and browser smoke test remains open. DOM semantics, keyboard behavior, and live-region scope are automated, but this sandbox has no screen reader for a conformance claim.
-- **Task 10.7:** Owner acceptance remains pending after the final implementation and release evidence review.
