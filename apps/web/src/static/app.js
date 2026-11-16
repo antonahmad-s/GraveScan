@@ -89,6 +89,7 @@ const detailEmptyLead = $("#detail-empty-lead");
 const detailEmptyNote = $("#detail-empty-note");
 const detail = $("#finding-detail");
 const caseFile = $(".case-file");
+const board = $(".evidence-board");
 const backButton = $("#back-button");
 const reportActionStatus = $("#report-action-status");
 const scanButton = $("#scan-button");
@@ -167,22 +168,28 @@ function measureHeader() {
   document.documentElement.style.setProperty("--header", `${headerOffset()}px`);
 }
 
+// A scroll still in motion, such as the browser bringing a just-focused control into view, would carry
+// the target away after the position check, so a moving page always gets an explicit scroll.
+let lastScroll = 0;
+window.addEventListener("scroll", () => { lastScroll = window.performance.now(); }, { passive: true });
+
 // A new result scrolls near the top of the view. A control the visitor returns to only scrolls when hidden.
 function reveal(element, nearest = false) {
   const box = element.getBoundingClientRect();
-  if (nearest) {
-    if (box.top < headerOffset() || box.bottom > window.innerHeight) element.scrollIntoView({ block: "nearest" });
-  } else if (box.top < headerOffset() || box.top > window.innerHeight * 0.6) {
-    element.scrollIntoView({ block: "start" });
-  }
+  const moving = window.performance.now() - lastScroll < 150;
+  const away = nearest ? box.top < headerOffset() || box.bottom > window.innerHeight : box.top < headerOffset() || box.top > window.innerHeight * 0.6;
+  if (moving || away) element.scrollIntoView({ block: nearest ? "nearest" : "start" });
+  return moving || away;
 }
 
 // Focus follows the result the visitor just caused, so a keyboard or screen-reader user is never left
-// on a control that was replaced or on content that moved out of view.
+// on a control that was replaced or on content that moved out of view. A scroll the browser starts for the
+// activated control (assistive technology can focus and click in one step) may not have moved yet, so a
+// target that looked in place is checked once more.
 let guidedFocus = false;
 function focusTarget(element, { show = element, nearest = false } = {}) {
   if (!element) return;
-  reveal(show, nearest);
+  if (!reveal(show, nearest)) window.setTimeout(() => { if (document.activeElement === element) reveal(show, nearest); }, 150);
   guidedFocus = true;
   element.focus({ preventScroll: true });
   guidedFocus = false;
@@ -884,6 +891,12 @@ document.addEventListener("keydown", (event) => {
   open.querySelector("summary").focus();
 });
 new window.ResizeObserver(measureHeader).observe(topbar);
+// When the sticky queue rests at the end of the review grid, content it gains grows it upward, which can
+// slide a focused control (Export Markdown, the filters) under the header. Bring that control back.
+new window.ResizeObserver(() => {
+  const active = document.activeElement;
+  if (board.contains(active) && active.getBoundingClientRect().top < headerOffset()) active.scrollIntoView({ block: "nearest" });
+}).observe(board);
 window.addEventListener("resize", measureHeader);
 
 try {

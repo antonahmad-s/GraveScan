@@ -42,8 +42,9 @@ Each line gives the reason for one decision (antislop R-31).
 
 - **Focus follows results:** selecting a finding focuses the case title. A scan or reset focuses the Findings heading. Replay, patch, and apply focus the stage heading that holds the new result. A failed action focuses its error inside the stage.
 - **No unexpected jumps:** filter changes keep focus in the select. "Clear filters" hides itself, so focus moves to the severity filter.
-- **A way back:** "Back to findings" sits before the case title. On wide screens it is visually hidden until it receives focus, because the queue is already beside the case file.
-- **Focus is never under the header:** scroll padding and the sticky queue use the header's measured height, and a control that receives focus under the sticky header scrolls just enough to show it.
+- **A way back for every input:** "Back to findings" sits before the case title and returns focus to the selected finding. It is visible on phones, tablets, and short desktop windows. Only where the sticky queue keeps every finding in view beside the case file (960 by 640 CSS pixels and larger) is it hidden until it receives keyboard focus, because mouse and touch users can already click the next finding there.
+- **Focus is never under the header:** scroll padding and the sticky queue use the header's measured height. A control that receives focus under the sticky header scrolls just enough to show it, and so does a focused queue control that the resting sticky queue pushes upward when it grows (for example after Export Markdown adds its notice).
+- **Focus moves survive in-flight scrolls:** a focus target that looks in place is checked again 150 ms later, so a scroll the browser started for the activated control cannot carry the new result out of view. Assistive technology can focus and click in one step, which triggers this.
 - **One live status:** the header status line announces page-level results. Inline notices are visible but not live, so a result is announced once.
 - **Escape closes disclosures:** inside an open `details` (paste box, diagnostics, replay steps), Escape closes it and returns focus to its summary. Typed text stays in the field.
 - **Long machine text scrolls in place:** evidence and diffs keep their line structure and scroll horizontally inside a focusable, labeled region.

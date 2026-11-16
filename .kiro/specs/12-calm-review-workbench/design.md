@@ -74,9 +74,10 @@ After apply, the Replay stage keeps the result from before the patch and says so
 
 ### Focus and scrolling
 
-- `focusTarget(element, { show, nearest })` reveals `show` (default: the element) and focuses with `preventScroll`. New results scroll near the top; returning to a control only scrolls when it is hidden.
+- `focusTarget(element, { show, nearest })` reveals `show` (default: the element) and focuses with `preventScroll`. New results scroll near the top; returning to a control only scrolls when it is hidden. A scroll still in motion always gets an explicit scroll, and a target that looked in place is checked again after 150 ms, so a scroll the browser started for the activated control cannot carry the result away.
 - `--header` holds the sticky header's measured height (ResizeObserver plus resize). `html` uses it as `scroll-padding-top`, and the sticky queue uses it for `top` and `max-height`.
-- A `focusin` safety net scrolls any control that receives focus under the sticky header just into view.
+- A `focusin` safety net scrolls any control that receives focus under the sticky header just into view. A ResizeObserver on the queue does the same when the resting sticky queue grows upward under a focused control.
+- "Back to findings" returns focus to the selected finding. It is visible everywhere except where the sticky queue keeps the findings beside the case file; there it appears on keyboard focus, and mouse and touch users click the next finding directly.
 - Escape inside an open `details` closes it and returns focus to its summary, except during IME composition.
 
 ### Busy handling
@@ -91,8 +92,8 @@ Work is serialized in the Worker. While a request runs, handlers return early in
 | 600px and up | Folder button and source actions size to content. |
 | 720px and up, height 560px and up | Sticky header. |
 | 760px and up | Aperture emblem beside the intro copy. |
-| 960px and up | Two-column source panel, four capabilities in one row, review grid with the queue capped at min(23rem, 38%). "Back to findings" visible only on focus. |
-| 960 by 640px and up | Sticky findings queue with its own scroll. |
+| 960px and up | Two-column source panel, four capabilities in one row, review grid with the queue capped at min(23rem, 38%). |
+| 960 by 640px and up | Sticky findings queue with its own scroll. "Back to findings" shows on keyboard focus only. |
 
 ## Motion
 

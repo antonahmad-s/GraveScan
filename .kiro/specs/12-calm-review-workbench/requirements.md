@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented on 2026-11-16 from the owner's brief in the same session. Automated validation passed. The manual screen-reader smoke test and a true browser-zoom check in a non-headless browser remain open; see `tasks.md`.
+Implemented on 2026-11-16 from the owner's brief in the same session, and approved by the owner after review. Automated validation and the final validation against `main` passed. The manual screen-reader smoke test and a true browser-zoom check in a non-headless browser remain open; see `tasks.md`.
 
 ## Introduction
 
@@ -38,6 +38,7 @@ Scope is the static UI (`apps/web/src/static/index.html`, `styles.css`, `app.js`
 - **R4.1** On wide screens the findings queue is narrower than the case file, the case file is the focal surface, and the queue stays reachable while reading. A sticky queue is used only where it does not trap scrolling.
 - **R4.2** On narrow screens the order is source context, scan summary, findings queue, and selected case detail.
 - **R4.3** The page never scrolls horizontally. Evidence and diffs scroll inside their own container. Content is not clipped at 390, 768, 1060, and 1440px or at 200 percent text size.
+- **R4.4** Keyboard, mouse, and touch users each have an equally direct way back from the case file to the findings list. Added by the owner on review, 2026-11-16.
 
 ### R5. Findings list
 
@@ -91,3 +92,4 @@ Scope is the static UI (`apps/web/src/static/index.html`, `styles.css`, `app.js`
 | AC-05 | No page overflow, no clipped content, and no visible button under 44px at the required widths, themes, and zoom levels. |
 | AC-06 | Every changed color pairing meets WCAG AA text contrast or 3:1 for boundaries and focus, measured with the contrast checker. |
 | AC-07 | Engine, Worker, CSP, redaction, and request-list tests are unchanged and pass. |
+| AC-08 | CLI JSON and SARIF output, the built Worker, and the response headers are byte-identical to `main`. |
