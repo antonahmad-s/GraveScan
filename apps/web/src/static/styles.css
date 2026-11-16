@@ -134,7 +134,7 @@ code { font-family: var(--font-mono); font-size: 0.875em; }
 .shell { width: 100%; max-width: 1280px; margin-inline: auto; padding-inline: var(--gutter); }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 /* The page's scroll padding keeps focused content below the sticky header; targets add a little air. */
-[tabindex="-1"], .case-file, .finding-button, .primary-button, .quiet-button { scroll-margin-top: 1.25rem; }
+[tabindex="-1"], .case-file, .finding-button, .primary-button, .quiet-button { scroll-margin-block: 1.25rem; }
 
 .skip-link { position: absolute; top: -5rem; left: 1rem; z-index: 30; padding: 0.75rem 1rem; border-radius: var(--radius-s); background: var(--paper); color: var(--text-on-paper); font-weight: 700; text-decoration: none; }
 .skip-link:focus { top: 0.75rem; outline-color: var(--signal-on-paper); }
@@ -404,13 +404,14 @@ body:has(#workbench[aria-busy="true"]) .status-line::before { background: var(--
   .source-bar > .notice { grid-column: 1 / -1; }
   /* The queue is capped by width and by share, so enlarged text widens the case file, not the queue. */
   .review-grid { grid-template-columns: minmax(0, min(23rem, 38%)) minmax(0, 1fr); }
-  /* The queue is in view beside the case file, so the return link shows only to keyboard users. */
   .case-file-head { min-height: 44px; }
-  .back-button:not(:focus-visible) { position: absolute; width: 1px; height: 1px; min-height: 0; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
-/* Sticky queue only where it helps: wide and tall screens. Its own scroll chains to the page at the ends. */
+/* Sticky queue only where it helps: wide and tall screens. Its own scroll chains to the page at the ends.
+ * Only here, with the queue always in view beside the case file, does the return link show on focus alone.
+ * Everywhere else it stays visible, so mouse and touch users have the same way back. */
 @media (min-width: 960px) and (min-height: 640px) {
   .evidence-board { position: sticky; top: calc(var(--header) + 1rem); max-height: calc(100dvh - var(--header) - 2rem); margin: -0.5rem; padding: 0.5rem; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
+  .back-button:not(:focus-visible) { position: absolute; width: 1px; height: 1px; min-height: 0; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 
 @media (hover: hover) {

@@ -242,6 +242,34 @@ test("keyboard: skip link is first, Enter selects sources, focus follows each ne
   await expect(page.locator("#stage-verify")).toHaveText("Verify: passed");
 });
 
+test("mouse and touch users can return from the case file to the findings list", async ({ page }) => {
+  // Stacked and short layouts show a visible return link; a click brings back the selected finding.
+  const layouts: [number, number][] = [[390, 844], [1280, 600]];
+  for (const [width, height] of layouts) {
+    await page.setViewportSize({ width, height });
+    await scanUnsafeMcp(page);
+    await page.getByRole("button", { name: /GRAVE-001/ }).click();
+    const back = page.getByRole("button", { name: "Back to findings" });
+    await expect(back).toBeVisible();
+    expect((await back.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await back.click();
+    const selected = page.locator('.finding-button[aria-current="true"]');
+    await expect(selected).toBeFocused();
+    await expect(selected).toBeInViewport();
+  }
+
+  // Wide and tall layouts keep the queue in view beside the case file, so another finding is one click away.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await scanUnsafeMcp(page);
+  await page.getByRole("button", { name: /GRAVE-001/ }).click();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const other = page.getByRole("button", { name: /GRAVE-009/ });
+  await expect(other).toBeInViewport();
+  await other.click();
+  await expect(page.locator("#case-title")).toHaveText("Configuration contains a secret-like value");
+});
+
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
   for (const theme of ["dark", "light"] as const) {
     test(`responsive ${theme} flow has no horizontal overflow or undersized controls at ${width}px`, async ({ page }) => {
