@@ -4,8 +4,8 @@
   "description": "Scan Kiro agent configuration, replay the risk safely, and verify the patch in your browser.",
   "start_url": "/",
   "display": "standalone",
-  "theme_color": "#0d0c13",
-  "background_color": "#0d0c13",
+  "theme_color": "#10100f",
+  "background_color": "#10100f",
   "icons": [
     { "src": "/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }

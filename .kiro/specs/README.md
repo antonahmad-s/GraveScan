@@ -14,5 +14,6 @@ Each spec follows Requirements, then Design, then Tasks.
 | 08 | trusted-renderer-and-sarif-ci | DOM-only renderer, Trusted Types, GitHub SARIF upload workflow |
 | 09 | editorial-workbench-and-icons | redesigned responsive workbench, evidence trail, inline errors, owner's logo as favicon and app icon |
 | 10 | architectural-security-atelier | owner-reference-inspired ink, mineral paper, and stone interface with scanning aperture and responsive review field |
+| 11 | production-workbench-redesign | proposed production-first source flow, inspectable diagnostics, workflow clarity, and responsive/accessibility hardening |
 
-Specs 01 through 10 are implemented and verified with `pnpm verify` (ESLint, tsc, Vitest with fast-check), `pnpm test:e2e` (Playwright), and `pnpm self-scan`. See `docs/ui-delivery-gate.md` for the browser delivery gate.
+Specs 01 through 10 are implemented and verified with `pnpm verify` (ESLint, tsc, Vitest with fast-check), `pnpm test:e2e` (Playwright), and `pnpm self-scan`. Spec 11 is implemented with automated release validation complete; its remaining manual accessibility and zoom checks are listed in the spec and `docs/ui-delivery-gate.md`.

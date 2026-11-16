@@ -24,3 +24,12 @@ The page script (`apps/web/src/static/app.js`) never runs the engine. It starts 
 ## Static delivery and cache boundary
 
 `pnpm build` fingerprints the engine worker, UI script, stylesheet, and fixture bundle with a SHA-256-derived URL. `dist/_headers` applies the CSP and other security headers to every response, then adds `Cache-Control: public, max-age=31536000, immutable` only to `/assets/*`. `index.html` has no long-lived cache rule, so it receives the new asset URLs on the next request after deploy. `scripts/serve-dist.ts` applies the same header rules locally for Playwright.
+
+
+## Workbench state and resilience
+
+The browser page keeps only presentation state: active source ID, redacted report, selected finding, replay, patch, verification, busy state, and theme preference. Project contents stay in the Worker. A new local import replaces the previous local source and patch state. Reloading discards the Worker and all scan state; `localStorage` retains only the selected theme.
+
+The Worker queue processes one request at a time. This prevents scan, patch, and verification state from interleaving. The protocol has no individual-request cancellation or rollback message, so the UI does not advertise cancellation. If the Worker fails unexpectedly, every pending request rejects with generic reload guidance and source actions become unavailable until reload.
+
+The page renders security facts from the active redacted Worker response. A finding that is absent after an isolated patch remains visible only as explicitly labeled baseline evidence beside the verification record. Parse diagnostics remain separate from findings and expose their code, file, line, and safe parser message.

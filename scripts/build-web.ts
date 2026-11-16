@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { build } from "esbuild";
+import { build, transform } from "esbuild";
 import { listFixtures, loadFixture, type FixtureFile } from "@gravescan/fixtures";
 
 // Builds the static site that Cloudflare serves. Content-hashed assets may be cached indefinitely:
@@ -97,7 +97,13 @@ export async function buildWeb(): Promise<void> {
   let app = readFileSync(path.join(staticDir, "app.js"), "utf8");
   app = replaceOnce(app, '"/assets/engine-worker.js"', `"${workerUrl}"`);
   app = replaceOnce(app, '"/assets/fixtures.json"', `"${fixturesUrl}"`);
-  const appUrl = writeAsset("app", ".js", app);
+  const minifiedApp = await transform(app, {
+    loader: "js",
+    target: "es2022",
+    minify: true,
+    legalComments: "none",
+  });
+  const appUrl = writeAsset("app", ".js", minifiedApp.code);
 
   let markup = readFileSync(path.join(staticDir, "index.html"), "utf8");
   markup = replaceOnce(markup, 'href="/assets/styles.css"', `href="${stylesUrl}"`);
