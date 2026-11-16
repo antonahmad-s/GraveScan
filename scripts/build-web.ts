@@ -97,8 +97,10 @@ export async function buildWeb(): Promise<void> {
   let app = readFileSync(path.join(staticDir, "app.js"), "utf8");
   app = replaceOnce(app, '"/assets/engine-worker.js"', `"${workerUrl}"`);
   app = replaceOnce(app, '"/assets/fixtures.json"', `"${fixturesUrl}"`);
+  // The page loads app.js as a module script, so module scope lets esbuild shorten its top-level names.
   const minifiedApp = await transform(app, {
     loader: "js",
+    format: "esm",
     target: "es2022",
     minify: true,
     legalComments: "none",

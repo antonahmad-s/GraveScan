@@ -28,7 +28,7 @@ The page script (`apps/web/src/static/app.js`) never runs the engine. It starts 
 
 ## Workbench state and resilience
 
-The browser page keeps only presentation state: active source ID, redacted report, selected finding, replay, patch, verification, busy state, and theme preference. Project contents stay in the Worker. A new local import replaces the previous local source and patch state. Reloading discards the Worker and all scan state; `localStorage` retains only the selected theme.
+The browser page keeps only presentation state: active source ID, redacted report, selected finding, replay, patch, verification, busy state, and theme preference. Project contents stay in the Worker. Choosing a folder reads and validates its `.kiro` files in the Worker and selects them as the active source; the visitor then starts the scan. A pasted `mcp.json` is scanned once the Worker accepts it. A new local import replaces the previous local source and patch state. Reloading discards the Worker and all scan state; `localStorage` retains only the selected theme.
 
 The Worker queue processes one request at a time. This prevents scan, patch, and verification state from interleaving. The protocol has no individual-request cancellation or rollback message, so the UI does not advertise cancellation. If the Worker fails unexpectedly, every pending request rejects with generic reload guidance and source actions become unavailable until reload.
 

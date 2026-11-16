@@ -1,6 +1,64 @@
 # UI Design Decisions
 
-Design Read: security workbench for developers and technical judges, in an architectural security atelier language, dial ENERGY 3 / RHYTHM 3 / MOTION 2. Spec 10 records the refinement from the owner's visual reference. The reference informs the visual qualities below, not a site to copy.
+Design Read (current, Spec 12): security workbench for developers and technical judges, with a clean editorial interface, strong evidence hierarchy, and restrained architectural visual language, dial ENERGY 2 / RHYTHM 2 / MOTION 1. The owner set this direction on 2026-11-16.
+
+## Calm review workbench, Spec 12
+
+Each line gives the reason for one decision (antislop R-31).
+
+### Orientation
+
+- **Headline states the job:** "Inspect Kiro configuration before an agent can cross a risky boundary." The sentence below it says which files are read and that they stay in the tab.
+- **Four plain capabilities instead of a stepped graphic:** Scan a project, Inspect evidence, Replay a risk safely, and Review and verify a patch are the four things the product actually does, so the list has four items, separated only by a hairline.
+- **Aperture becomes an emblem:** the tombstone aperture shrinks to about 11rem beside the copy and is hidden below 760px. The headline and the folder action are the first focus at every width.
+- **No framed masthead:** the intro sits on the page surface. Removing its panel removed one of three competing cards from the first screen.
+
+### Source choice
+
+- **One primary per stage:** "Choose project folder" is the only solid button until a source is selected. Then the selected source's scan becomes the solid button and the folder picker turns outlined.
+- **Examples read as choices:** each controlled example is a full-width row with a radio-style marker, its description, its ID, and a "Selected" word when pressed. They no longer look like three equal promotional cards.
+- **Folder choice no longer scans silently:** choosing a folder loads and validates its files, reports how many were loaded and skipped, selects "Your project", and moves focus to "Scan current project". Paste still scans at once, because its button is labeled "Scan pasted mcp.json".
+- **Errors sit at their cause:** folder errors appear under the folder button, paste errors directly under the textarea (which is also marked `aria-invalid`), and scan errors in the selected-source bar.
+- **The selected source keeps its boundary:** the source bar names the active source and its privacy boundary, and the findings queue repeats both after a scan.
+
+### Review workspace
+
+- **One focal surface:** the case file is the only card in the review area. The findings queue sits on the page surface, so the two regions no longer look equal.
+- **Narrow queue, wide case file:** at 960px and wider the queue is capped at 23rem or 38 percent, whichever is smaller. Capping by share keeps the case file wide at 200 percent text size.
+- **Sticky queue only when it helps:** the queue sticks beside the case file at 960 by 640 CSS pixels and larger. Its own scroll chains to the page at both ends. Smaller and zoomed screens stack instead.
+- **Selection is a shape:** the selected finding has a 4px plum bar, a tint, and `aria-current="true"`.
+- **Filter feedback is one line:** "3 of 8 findings shown" or "No findings match these filters. Clear filters to review all current findings." The filter panel stays hidden until a scan has findings.
+
+### Case file and evidence trail
+
+- **The trail is the case file:** the case file is the numbered Scan, Replay, Patch, Verify sequence. Evidence, replay output, the diff, and verification each live inside their own stage, so the order of work is the order of reading.
+- **States use words and shapes:** every stage heading names its state ("Replay: exposed", "Patch: ready to review"). Markers are a number while pending, a drawn check when done or passed, an exclamation mark when exposed or failed, and a dashed ring when unavailable.
+- **Replay leads, patch follows:** "Run safe replay" is the solid button while the replay has not run; "Propose safe patch" stays outlined until then. After a patch is proposed, "Apply to isolated copy" is the only solid button.
+- **Verification is the largest status:** the result appears as a display-type badge with a drawn check or an exclamation mark, followed by a sentence derived from the engine fields (target finding present, replay result, High or Critical counts).
+- **Before and after stay distinct:** after a patch, the Replay stage keeps the result from before the patch and says so. The Verify stage shows the replay after the patch, with its steps in a disclosure.
+- **Static evidence stays honest:** findings without a scenario show "Replay: unavailable"; rules without an allowlisted patch show "Patch: manual remediation" and no patch control.
+
+### Keyboard and announcements
+
+- **Focus follows results:** selecting a finding focuses the case title. A scan or reset focuses the Findings heading. Replay, patch, and apply focus the stage heading that holds the new result. A failed action focuses its error inside the stage.
+- **No unexpected jumps:** filter changes keep focus in the select. "Clear filters" hides itself, so focus moves to the severity filter.
+- **A way back:** "Back to findings" sits before the case title. On wide screens it is visually hidden until it receives focus, because the queue is already beside the case file.
+- **Focus is never under the header:** scroll padding and the sticky queue use the header's measured height, and a control that receives focus under the sticky header scrolls just enough to show it.
+- **One live status:** the header status line announces page-level results. Inline notices are visible but not live, so a result is announced once.
+- **Escape closes disclosures:** inside an open `details` (paste box, diagnostics, replay steps), Escape closes it and returns focus to its summary. Typed text stays in the field.
+- **Long machine text scrolls in place:** evidence and diffs keep their line structure and scroll horizontally inside a focusable, labeled region.
+
+### Visual system
+
+- **Same palette, fewer surfaces:** charcoal, mineral paper, warm stone, and plum keep their earlier values. The page now has two structural blocks, the stone source panel and the case file, instead of four framed panels.
+- **Light theme inverts the focal surface:** the light page is mineral paper and the case file becomes ink, so both themes keep one dark or light reading block.
+- **Fewer lines:** separators are a 55 percent tint of the edge color, used only between rows and stage content. Component boundaries keep at least 3:1.
+- **Radius by role:** 4px for severity tags, 6px for controls and code, 10px for source rows, and 16px for the two structural blocks.
+- **No elevation shadows:** nothing on the page floats. Hover uses a tint, and the selected radio ring is an inset ring.
+- **MOTION 1:** only color, border, and tint transitions on hover and selection, plus smooth scrolling to a new result. Both sit inside `prefers-reduced-motion: no-preference`. The previous rise and stamp animations were removed.
+- **The page script is minified as a module:** `scripts/build-web.ts` now passes `format: "esm"`, which matches the page's module script and lets esbuild shorten top-level names. The script is 22 KiB, inside the 25 KiB budget, with the added focus and state handling.
+
+The sections below record Specs 10 and 11. Where they differ from Spec 12 (masthead framing, headline length, the step list, motion, and the auto-scan after a folder load), Spec 12 applies.
 
 ## Identity
 

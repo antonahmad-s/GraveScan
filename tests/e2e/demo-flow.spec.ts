@@ -19,7 +19,14 @@ async function scanUnsafeMcp(page: Page): Promise<void> {
   await page.getByRole("button", { name: /Unsafe MCP/ }).click();
   await expect(page.getByRole("button", { name: /Unsafe MCP/ })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Run example scan" }).click();
-  await expect(page.locator("#status-line")).toContainText("Scan complete. 4 evidence-based findings");
+  await expect(page.locator("#status-line")).toContainText("Scan complete. 4 findings are available.");
+}
+
+async function loadFolderAndScan(page: Page, root: string): Promise<void> {
+  await page.locator("#folder-input").setInputFiles(root);
+  await expect(page.locator("#status-line")).toContainText("Scan the current project when ready.");
+  await page.getByRole("button", { name: "Scan current project" }).click();
+  await expect(page.locator("#status-line")).toContainText("Scan complete.");
 }
 
 async function patchUnsafeMcp(page: Page): Promise<void> {
@@ -38,10 +45,12 @@ test("local-project workflow leads source selection and examples stay explicit",
   const source = page.locator("#source-heading");
   const local = page.locator("#local-heading");
   const examples = page.locator("#fixture-heading");
-  await expect(source).toHaveText("Start with your project");
-  await expect(local).toHaveText("Scan your .kiro configuration");
-  await expect(examples).toHaveText("Try an example case");
+  await expect(source).toHaveText("Choose what to scan");
+  await expect(local).toHaveText("Your project");
+  await expect(examples).toHaveText("Controlled examples");
   await expect(page.getByText("Controlled examples", { exact: true })).toBeVisible();
+  await expect(page.locator("#folder-button")).toHaveClass(/primary-button/);
+  await expect(page.locator("#scan-button")).not.toHaveClass(/primary-button/);
   await expect(page.getByText("does not upload files, run project code, or write to your repository")).toBeVisible();
   await expect(page.getByText("Safe simulation. No arbitrary code or network request is executed.")).toBeVisible();
 
@@ -78,11 +87,12 @@ test("demo flow preserves evidence, replay, patch, verification, export, and res
   await page.goto("/");
   await waitForReady(page);
   await expect(page.getByText("Choose a project folder or example, then run a scan.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run selected scan" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Scan selected source" })).toBeDisabled();
 
   await page.getByRole("button", { name: /Unsafe MCP/ }).click();
+  await expect(page.getByRole("button", { name: "Run example scan" })).toHaveClass(/primary-button/);
   await page.getByRole("button", { name: "Run example scan" }).click();
-  await expect(page.locator("#source-stage-summary")).toHaveText("Example active: Unsafe MCP. Review the current findings below.");
+  await expect(page.locator("#source-stage-summary")).toHaveText("Unsafe MCP. Controlled example data with fake tokens only. Scanned. Review the findings below.");
   await expect(page.getByLabel("Findings by severity")).toContainText(/3\s*high/);
   await expect(page.getByLabel("Findings by severity")).toContainText(/1\s*medium/);
   await expect(page.locator(".finding-button .severity")).toHaveText(["high", "high", "high", "medium"]);
@@ -90,16 +100,23 @@ test("demo flow preserves evidence, replay, patch, verification, export, and res
 
   await page.getByRole("button", { name: /GRAVE-001/ }).click();
   await expect(page.locator(".evidence").first()).toContainText("autoApprove");
-  await expect(page.getByText("A safe replay is available. A patch can be proposed only through the allowlisted patcher.")).toBeVisible();
+  // Replay is the recommended first action; the patch stays secondary until the replay result is known.
+  await expect(page.locator("#stage-replay")).toHaveText("Replay: not run");
+  await expect(page.locator("#replay-button")).toHaveClass(/primary-button/);
+  await expect(page.locator("#patch-button")).toHaveClass(/quiet-button/);
 
   await page.getByRole("button", { name: "Run safe replay" }).click();
   await expect(page.getByText("Capability exposure reproduced safely.")).toBeVisible();
   await expect(page.getByText("Safe simulation. No arbitrary code or network request was executed.").last()).toBeVisible();
+  await expect(page.locator("#stage-replay")).toHaveText("Replay: exposed");
+  await expect(page.locator("#patch-button")).toHaveClass(/primary-button/);
 
   await page.getByRole("button", { name: "Propose safe patch" }).click();
   await expect(page.locator(".diff")).toContainText("--- a/.kiro/settings/mcp.json");
+  await expect(page.locator("#apply-button")).toHaveClass(/primary-button/);
   await page.getByRole("button", { name: "Apply to isolated copy" }).click();
   await expect(page.getByText("Simulation blocked", { exact: true })).toBeVisible();
+  await expect(page.locator("#stage-verify")).toHaveText("Verify: passed");
   await expect(page.locator("#finding-detail")).toContainText("Baseline scan");
   await expect(page.locator("#finding-detail")).toContainText("baseline evidence");
   const comparison = page.getByLabel("Findings compared with the first scan");
@@ -127,13 +144,16 @@ test("demo flow preserves evidence, replay, patch, verification, export, and res
 
 test("filters show result counts and provide an explicit reset", async ({ page }) => {
   await scanUnsafeMcp(page);
-  await expect(page.locator("#filter-summary")).toHaveText("4 of 4 findings shown.");
+  await expect(page.locator("#filter-summary")).toHaveText("4 of 4 findings shown");
+  await page.locator("#severity-filter").focus();
   await page.selectOption("#severity-filter", "critical");
-  await expect(page.getByText("No findings match the selected filters. Clear filters to review all current findings.")).toBeVisible();
-  await expect(page.locator("#filter-summary")).toHaveText("0 of 4 findings shown.");
+  await expect(page.locator("#filter-summary")).toHaveText("No findings match these filters. Clear filters to review all current findings.");
+  await expect(page.locator("#finding-list li")).toHaveCount(0);
+  await expect(page.locator("#severity-filter")).toBeFocused();
   await expect(page.getByRole("button", { name: "Clear filters" })).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(page.locator("#filter-summary")).toHaveText("4 of 4 findings shown.");
+  await expect(page.locator("#filter-summary")).toHaveText("4 of 4 findings shown");
+  await expect(page.locator("#severity-filter")).toBeFocused();
 
   await page.selectOption("#rule-filter", "GRAVE-001");
   await expect(page.locator("#finding-list li")).toHaveCount(1);
@@ -164,11 +184,21 @@ test("light and dark themes both apply", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
 
-test("keyboard: skip link is first, Enter selects sources and findings, focus remains visible", async ({ page }) => {
+test("keyboard: skip link is first, Enter selects sources, focus follows each new result", async ({ page }) => {
   await page.goto("/");
   await waitForReady(page);
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to workspace" })).toBeFocused();
+
+  const paste = page.locator(".paste-box");
+  await page.locator(".paste-box > summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(paste).toHaveAttribute("open", "");
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("mcp.json content")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(paste).not.toHaveAttribute("open", "");
+  await expect(page.locator(".paste-box > summary")).toBeFocused();
 
   const fixture = page.getByRole("button", { name: /Unsafe MCP/ });
   await fixture.focus();
@@ -177,12 +207,39 @@ test("keyboard: skip link is first, Enter selects sources and findings, focus re
   await expect(fixture).toBeFocused();
   expect(await fixture.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
 
-  await page.getByRole("button", { name: "Run example scan" }).click();
-  const finding = page.getByRole("button", { name: /GRAVE-002/ });
+  await page.getByRole("button", { name: "Run example scan" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#evidence-heading")).toBeFocused();
+
+  // Selecting a finding moves focus to the case file title, so the new detail is announced.
+  const finding = page.getByRole("button", { name: /GRAVE-001/ });
   await finding.focus();
   await page.keyboard.press("Enter");
   await expect(finding).toHaveAttribute("aria-current", "true");
+  const title = page.locator("#case-title");
+  await expect(title).toBeFocused();
+  await expect(title).toHaveText("Auto-approved shell-capable MCP tool");
+  expect(await title.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
+
+  // One Shift+Tab reaches a return link, which appears on focus and goes back to the selected finding.
+  await page.keyboard.press("Shift+Tab");
+  const back = page.getByRole("button", { name: "Back to findings" });
+  await expect(back).toBeFocused();
+  expect((await back.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  await page.keyboard.press("Enter");
   await expect(finding).toBeFocused();
+
+  // Each case action replaces its button, so focus moves to the stage that now holds the result.
+  await page.locator("#replay-button").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#stage-replay")).toBeFocused();
+  await page.locator("#patch-button").focus();
+  await page.keyboard.press("Space");
+  await expect(page.locator("#stage-patch")).toBeFocused();
+  await page.locator("#apply-button").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#stage-verify")).toBeFocused();
+  await expect(page.locator("#stage-verify")).toHaveText("Verify: passed");
 });
 
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
@@ -200,8 +257,9 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
       const metrics = await page.evaluate(() => ({
         scroll: document.documentElement.scrollWidth,
         viewport: window.innerWidth,
+        // A 1px clipped control is visually hidden until focus; the keyboard test checks its focused size.
         small: [...document.querySelectorAll("button")]
-          .filter((button) => (button as HTMLElement).offsetParent !== null && button.getBoundingClientRect().height < 44)
+          .filter((button) => (button as HTMLElement).offsetParent !== null && button.getBoundingClientRect().width > 1 && button.getBoundingClientRect().height < 44)
           .map((button) => button.textContent?.trim()),
       }));
       expect(metrics.scroll).toBeLessThanOrEqual(metrics.viewport);
@@ -280,7 +338,8 @@ test("a pasted mcp.json remains local, clears after acceptance, and can be verif
   await expect(page.locator("#status-line")).toContainText("Scan complete.");
   await expect(page.getByLabel("mcp.json content")).toHaveValue("");
   await expect(page.getByRole("button", { name: /Your project/ })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("#source-stage-summary")).toContainText("Your project is active in this tab.");
+  await expect(page.locator("#source-stage-summary")).toContainText("Your project. Local .kiro files stay in this tab.");
+  await expect(page.locator("#source-stage-summary")).toContainText("Scanned.");
 
   await patchUnsafeMcp(page);
   expect(await page.evaluate(() => Object.keys(localStorage).sort())).toEqual(["gravescan-theme"]);
@@ -324,8 +383,16 @@ test("a chosen project folder stays local and redacts secrets", async ({ page, b
   await page.goto("/");
   await waitForReady(page);
   await page.locator("#folder-input").setInputFiles(root);
+  // Choosing a folder only loads it. The visitor starts the scan, so nothing runs unannounced.
+  await expect(page.locator("#local-summary")).toContainText("1 supported file loaded from .kiro/.");
+  await expect(page.locator("#status-line")).toHaveText("1 supported file loaded from .kiro/. Scan the current project when ready.");
+  await expect(page.getByRole("button", { name: /Your project/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#finding-list li")).toHaveCount(0);
+  const scan = page.getByRole("button", { name: "Scan current project" });
+  await expect(scan).toBeFocused();
+  await expect(scan).toHaveClass(/primary-button/);
+  await scan.click();
   await expect(page.locator("#status-line")).toContainText("Scan complete.");
-  await expect(page.locator("#local-summary")).toContainText("1 file loaded from .kiro/.");
   await expect(page.locator("#source-boundary")).toContainText("No upload or external service.");
 
   await page.getByRole("button", { name: /GRAVE-009/ }).click();
@@ -343,8 +410,7 @@ test("GRAVE-007 is static evidence with no unsupported replay or automatic patch
 
   await page.goto("/");
   await waitForReady(page);
-  await page.locator("#folder-input").setInputFiles(root);
-  await expect(page.locator("#status-line")).toContainText("Scan complete.");
+  await loadFolderAndScan(page, root);
   const finding = page.getByRole("button", { name: /GRAVE-007/ });
   await expect(finding).toContainText("Static evidence");
   await finding.click();
@@ -362,8 +428,7 @@ test("does not retain hostile steering markup as DOM", async ({ page }, testInfo
 
   await page.goto("/");
   await waitForReady(page);
-  await page.locator("#folder-input").setInputFiles(root);
-  await expect(page.locator("#status-line")).toContainText("Scan complete.");
+  await loadFolderAndScan(page, root);
   await page.getByRole("button", { name: /GRAVE-005/ }).click();
   await expect(page.locator(".evidence").first()).toContainText("<img src=x onerror=alert(1)>");
   expect(await page.locator("#finding-detail img").count()).toBe(0);

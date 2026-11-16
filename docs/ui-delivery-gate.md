@@ -1,5 +1,68 @@
 # UI Delivery Gate
 
+## Spec 12 delivery evidence, 2026-11-16
+
+Antislop mode: during (project steering). Dial: ENERGY 2 / RHYTHM 2 / MOTION 1. All checks ran against the built static site served with `dist/_headers`, in the sandbox Chromium (`/usr/local/bin/chrome`) because Playwright's browser download is blocked here.
+
+### Hard gate
+
+- **R-02:** PASS. `grep` finds no em dash in `index.html`, `styles.css`, `app.js`, or the Spec 12 documents.
+- **R-03:** PASS. Full-page captures at 390, 768, 1060, and 1440px in both themes (initial, scanned, replay, patch, verified) and a 320px verified capture show no horizontal overflow. The Playwright responsive matrix at 320, 390, 768, 1024, 1280, and 1440px in both themes reports no overflow and no visible button under 44px.
+- **R-17, R-18, R-36, R-38:** PASS. No statistics, logos, testimonials, or security claims were added. Every count on the page comes from the current Worker response.
+- **R-23, R-24:** PASS. The only image is the owner's tombstone mark. No navigation links were added.
+- **R-25:** PASS. Minimum normal-text ratio is 4.58:1 (`#302823` on stone `#aa8b76`, unchanged from Spec 11). New pairs: stone tile text 7.33:1, selected-source label 8.17:1 (dark) and 9.49:1 (light), selected finding meta 8.73:1 (dark) and 6.39:1 (light), diff removed line on the ink case file 4.96:1, diff added line 6.19:1 to 7.57:1, verified badge 7.31:1 (dark) and 10.15:1 (light), error notice on paper 5.78:1 and 6.91:1. Measured with `.kiro/skills/antislop-human/contrast-check.py`.
+- **Non-text contrast:** PASS. Selected-source border 4.81:1 (dark) and 5.30:1 (light) on stone, radio marker edge 6.12:1, selected finding bar 7.35:1 and 6.81:1, control edges 5.06:1 and 5.31:1, stage marker edge 4.44:1 on paper and 5.32:1 on ink, focus ring 4.81:1 on stone, 13.40:1 on charcoal, and 7.97:1 on light paper.
+- **R-26, R-35:** PASS. Keyboard-only click-through at 1440 by 900, 1060 by 800, 768 by 1024, and 390 by 844, no console errors:
+  - Paste disclosure: Enter opens it, Tab reaches the textarea, Escape closes it and focuses the summary.
+  - Unsafe MCP example: Space selects it and "Run example scan" becomes the primary button.
+  - "Run example scan": the scan completes and focus moves to the Findings heading.
+  - GRAVE-001: Enter selects it, the case file scrolls into view, and focus moves to the case title.
+  - Shift+Tab from the case title reaches "Back to findings"; Enter returns focus to the selected finding.
+  - "Run safe replay": focus moves to "Replay: exposed".
+  - "Propose safe patch": focus moves to "Patch: ready to review". Tab reaches the diff region, then "Apply to isolated copy".
+  - "Apply to isolated copy": focus moves to "Verify: passed" and the badge reads "Simulation blocked".
+  - "Export Markdown" downloads `gravescan-unsafe-mcp.md`.
+  - Severity "Critical" shows the no-match message with focus kept in the select; "Clear filters" restores four findings and focuses the severity filter.
+  - "Reset isolated copy" rescans and focuses the Findings heading.
+  - The theme switch toggles both themes.
+  - Folder input: a folder with a skipped 1 MiB file reports "2 supported files loaded from .kiro/. 1 file over 1 MiB skipped." and focuses "Scan current project" without scanning. A folder without `.kiro` shows "Files were not loaded. No .kiro folder was found." under the folder button. An empty paste shows its error under the textarea and focuses it.
+  - A forced Worker failure during replay shows the reload message inside the Replay stage, focuses it, and disables source and case actions.
+- **R-27:** PASS. Loading, empty, selected-not-scanned, scanning, clean scan, filtered-empty, folder loaded, folder error, paste error, case-action error, and success states each say what happened and what to do next. The clean scan reads "No rule matched these files. A clean scan is not proof that the project is secure."
+- **R-32, R-39:** PASS. First Tab reaches the skip link. Tab order matches visual order at every width. All controls are native buttons, selects, `details`, or textarea with visible labels, `cursor: pointer`, and distinct hover, active, focus, and disabled states. One `h1`, ordered `h2` to `h5`, and `header`, `main`, and `footer` landmarks.
+- **R-34:** PASS. Dark theme: charcoal page, stone source panel, paper case file. Light theme: paper page, stone source panel, ink case file. Both were reviewed in every captured state.
+- **R-40:** PASS. Images keep intrinsic dimensions. No third-party script, font, or request. The same-origin request allowlist test passes.
+
+### Purpose, liveliness, and craft
+
+- **Dials:** PASS. ENERGY 2 / RHYTHM 2 / MOTION 1 in `.kiro/steering/ui-direction.md`, Spec 12, and `docs/design-decisions.md`.
+- **Focal point:** PASS. The headline and folder action before a scan; the case file after it.
+- **Accent:** PASS. Plum marks the selected source, the selected finding, and the active stage.
+- **Motif:** PASS. The numbered Scan, Replay, Patch, Verify trail with text states and shape markers.
+- **Motion:** PASS. No animations remain. Transitions and smooth scrolling sit inside `prefers-reduced-motion: no-preference`; Playwright confirms `scroll-behavior` is not smooth under reduced motion.
+- **Decoration:** PASS. No gradients, glow, glass, grids, terminal styling, or elevation shadows were added. Box-shadow is used only for the inset selected-radio ring and an inset hover tint.
+- **CTAs:** PASS. Labels name their action: Choose project folder, Scan current project, Run example scan, Run safe replay, Propose safe patch, Apply to isolated copy, Export Markdown, Reset isolated copy.
+
+### Zoom
+
+- **Page zoom:** PASS. A 640 by 360 CSS-pixel viewport at device scale 2 (200 percent on 1280 by 720) completes the full flow with no overflow, no clipped text, and no target under 44px. The header and queue stop sticking there.
+- **Text size:** PASS. A 200 percent root font size at 1280 by 720 and 1440 by 900 completes the flow with no overflow. Two defects found by this check were fixed: grid tracks that refused to shrink below their content and a fixed header offset that let the sticky queue slide under a taller header.
+
+### Automated checks
+
+- `pnpm lint`, `pnpm typecheck`: PASS.
+- `pnpm test`: PASS, 28 files and 250 tests.
+- `pnpm build`: PASS. Page script 22,452 bytes (budget 25 KiB), Worker 92,022 bytes (budget 125 KiB), stylesheet 31,672 bytes, fixtures 2,598 bytes.
+- `pnpm test:e2e`: PASS, 30 Chromium tests.
+- `pnpm docs:check`, `pnpm repo:check`, `pnpm self-scan` (0 findings): PASS.
+
+### Open checks
+
+- Screen-reader smoke test (VoiceOver or NVDA) for the case-title announcement, stage headings, and the single live status.
+- True 200 percent browser zoom in a non-headless desktop browser.
+- Field performance remains unmeasured; no lab performance numbers were re-measured for Spec 12.
+
+## Earlier gate runs
+
 Antislop mode: during. Last run 2026-11-16 for the Spec 10 responsive cleanup (task 7), and before that for Spec 10 with `pnpm verify`, `pnpm test:e2e`, computed contrast checks, and screenshots at 390, 768, 1060, and 1440px in both themes. The local browser used the same built static files that Cloudflare serves.
 
 ## Hard gate

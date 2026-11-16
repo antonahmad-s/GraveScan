@@ -13,7 +13,9 @@ const pending = new Map();
 let nextRequestId = 1;
 let sources = [];
 let engineReady = false;
+let engineError = "";
 let localLabel = "";
+let busyTimer = 0;
 
 function send(type, body = {}) {
   return new Promise((resolve, reject) => {
@@ -54,6 +56,7 @@ const state = {
   replay: null,
   patch: null,
   verification: null,
+  actionError: null,
   busy: false,
 };
 
@@ -64,7 +67,12 @@ const fixtureNames = {
   [LOCAL_PROJECT]: "Your project",
 };
 
+// Stage markers pair each state with a shape, so the trail never depends on color alone.
+// Done and success markers draw their check mark in CSS, because not every system font has one.
+const MARKS = { done: "", success: "", danger: "!", skip: "−" };
+
 const $ = (selector) => document.querySelector(selector);
+const topbar = $(".topbar");
 const workbench = $("#workbench");
 const statusLine = $("#status-line");
 const fixtureList = $("#fixture-list");
@@ -72,17 +80,21 @@ const loadedProjectSource = $("#loaded-project-source");
 const localProjectButton = $("#local-project-button");
 const sourceStageSummary = $("#source-stage-summary");
 const sourceActionStatus = $("#source-action-status");
+const evidenceHeading = $("#evidence-heading");
+const triageContext = $("#triage-context");
 const findingList = $("#finding-list");
 const findingState = $("#finding-state");
 const detailState = $("#detail-state");
+const detailEmptyLead = $("#detail-empty-lead");
+const detailEmptyNote = $("#detail-empty-note");
 const detail = $("#finding-detail");
-const detailActionStatus = $("#detail-action-status");
-const reportActionStatus = $("#report-action-status");
-const board = $(".evidence-board");
 const caseFile = $(".case-file");
+const backButton = $("#back-button");
+const reportActionStatus = $("#report-action-status");
 const scanButton = $("#scan-button");
 const resetButton = $("#reset-button");
 const exportButton = $("#export-button");
+const filterPanel = $("#filter-panel");
 const severityFilter = $("#severity-filter");
 const ruleFilter = $("#rule-filter");
 const filterSummary = $("#filter-summary");
@@ -95,6 +107,7 @@ const folderInput = $("#folder-input");
 const pasteInput = $("#paste-input");
 const pasteButton = $("#paste-button");
 const localSummary = $("#local-summary");
+const pasteError = $("#paste-error");
 const sourceName = $("#source-name");
 const sourceBoundary = $("#source-boundary");
 const scanSummary = $("#scan-summary");
@@ -110,7 +123,7 @@ function node(tag, options = {}) {
 }
 
 function append(parent, ...children) {
-  for (const child of children.flat()) if (child !== undefined && child !== null && child !== false) parent.append(child);
+  for (const child of children.flat(Infinity)) if (child !== undefined && child !== null && child !== false) parent.append(child);
   return parent;
 }
 
@@ -124,12 +137,17 @@ function button(label, className, onClick, attrs = {}) {
   return control;
 }
 
-function section(children) {
-  return append(node("section", { className: "detail-section" }), children);
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-function evidence(content, className = "evidence") {
-  return append(node("pre", { className }), node("code", { text: content }));
+function note(value) {
+  return text("p", value, { className: "stage-note" });
+}
+
+// Long machine text scrolls inside its own region. The region is focusable so keyboard users can scroll it.
+function codeBlock(label, className, code) {
+  return append(node("pre", { className, attrs: { tabindex: 0, role: "region", "aria-label": label } }), code);
 }
 
 function severityTag(finding) {
@@ -140,9 +158,34 @@ function messageOf(error) {
   return error instanceof Error && error.message !== "" ? error.message : "The request could not be completed.";
 }
 
-function reveal(element) {
-  const top = element.getBoundingClientRect().top;
-  if (top < 0 || top > window.innerHeight / 2) element.scrollIntoView({ block: "start" });
+function headerOffset() {
+  return window.getComputedStyle(topbar).position === "sticky" ? topbar.offsetHeight : 0;
+}
+
+// Scroll padding and the sticky queue use the header's real height, which grows with enlarged text.
+function measureHeader() {
+  document.documentElement.style.setProperty("--header", `${headerOffset()}px`);
+}
+
+// A new result scrolls near the top of the view. A control the visitor returns to only scrolls when hidden.
+function reveal(element, nearest = false) {
+  const box = element.getBoundingClientRect();
+  if (nearest) {
+    if (box.top < headerOffset() || box.bottom > window.innerHeight) element.scrollIntoView({ block: "nearest" });
+  } else if (box.top < headerOffset() || box.top > window.innerHeight * 0.6) {
+    element.scrollIntoView({ block: "start" });
+  }
+}
+
+// Focus follows the result the visitor just caused, so a keyboard or screen-reader user is never left
+// on a control that was replaced or on content that moved out of view.
+let guidedFocus = false;
+function focusTarget(element, { show = element, nearest = false } = {}) {
+  if (!element) return;
+  reveal(show, nearest);
+  guidedFocus = true;
+  element.focus({ preventScroll: true });
+  guidedFocus = false;
 }
 
 function setStatus(message, kind = "") {
@@ -158,30 +201,40 @@ function setNotice(element, message, kind = "") {
   else element.dataset.kind = kind;
 }
 
-function clearLocalNotice() {
-  setNotice(localSummary, "");
+function localNote(message, kind = "") {
+  setNotice(localSummary, message, kind);
 }
 
-function setBusy(busy, message) {
+// Paste problems appear beside the field and mark it invalid; folder results appear beside the folder button.
+function pasteNote(message) {
+  setNotice(pasteError, message, message ? "error" : "");
+  if (message) pasteInput.setAttribute("aria-invalid", "true");
+  else pasteInput.removeAttribute("aria-invalid");
+}
+
+// Work is serialized in the Worker. While a request runs, handlers ignore new actions instead of
+// disabling every control, so fast actions do not make the page flicker. Slow work relabels its control.
+function setBusy(busy, message, control, label) {
   state.busy = busy;
   workbench.setAttribute("aria-busy", String(busy));
+  window.clearTimeout(busyTimer);
+  if (busy && control && label) busyTimer = window.setTimeout(() => { control.textContent = label; }, 250);
   if (message) setStatus(message);
-  renderControls();
+  if (!busy) renderControls();
 }
 
 function handleWorkerFailure(message) {
   rejectPending(message);
   engineReady = false;
-  state.busy = false;
-  workbench.setAttribute("aria-busy", "false");
+  engineError = message;
+  setBusy(false);
   setStatus(message, "error");
   setNotice(sourceActionStatus, message, "error");
   renderFixtures(sources);
-  renderControls();
 }
 
 function request(route, payload) {
-  if (!engineReady) return Promise.reject(new Error("The scanner is still loading."));
+  if (!engineReady) return Promise.reject(new Error(engineError || "The scanner is still loading."));
   return send("call", { route, payload });
 }
 
@@ -192,52 +245,38 @@ function sourceDetails() {
   if (state.fixture) {
     return { name: fixtureNames[state.fixture] || state.fixture, boundary: "Controlled example data with fake tokens only." };
   }
-  return { name: "Choose a source", boundary: "Browser-local analysis. No upload." };
-}
-
-function renderSourceStageSummary() {
-  if (!state.fixture) {
-    sourceStageSummary.textContent = "Choose a project folder or controlled example to begin.";
-    return;
-  }
-  if (state.fixture === LOCAL_PROJECT) {
-    sourceStageSummary.textContent = state.report
-      ? "Your project is active in this tab. Load another folder to replace it. Reload the page to remove local files."
-      : "Your project is loaded in this tab. Run a scan when ready.";
-    return;
-  }
-  if (state.report) {
-    sourceStageSummary.textContent = `Example active: ${fixtureNames[state.fixture] || state.fixture}. Review the current findings below.`;
-    return;
-  }
-  sourceStageSummary.textContent = `Example selected: ${fixtureNames[state.fixture] || state.fixture}. Run the selected scan to review its evidence.`;
+  return null;
 }
 
 function renderSourceContext() {
   const source = sourceDetails();
+  triageContext.hidden = !state.report || !source;
+  if (!source) {
+    sourceStageSummary.textContent = "None yet. Choose a project folder or a controlled example.";
+    return;
+  }
   sourceName.textContent = source.name;
   sourceBoundary.textContent = source.boundary;
-  renderSourceStageSummary();
+  sourceStageSummary.replaceChildren(text("strong", `${source.name}.`), ` ${source.boundary}${state.report ? " Scanned. Review the findings below." : ""}`);
 }
 
 function renderScanSummary() {
   scanSummary.replaceChildren();
-  if (!state.report) {
-    scanSummary.hidden = true;
-    return;
-  }
+  scanSummary.hidden = !state.report;
+  if (!state.report) return;
   const counts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const finding of state.report.findings) counts[finding.severity] += 1;
   const entries = Object.entries(counts).filter(([, count]) => count > 0);
   const diagnostics = state.report.diagnostics.length;
-  const findingLabel = `${state.report.findings.length} finding${state.report.findings.length === 1 ? "" : "s"}`;
-  const diagnosticLabel = diagnostics === 0 ? "No parse diagnostics." : `${diagnostics} parse diagnostic${diagnostics === 1 ? "" : "s"} available below.`;
-  const heading = append(node("div"), text("h3", "Current scan"), text("p", `${findingLabel}. ${diagnosticLabel}`));
   const list = node("ul", { className: "severity-counts", attrs: { "aria-label": "Findings by severity" } });
   if (entries.length === 0) append(list, append(node("li"), text("strong", "0"), text("span", "findings")));
   for (const [severity, count] of entries) append(list, append(node("li", { className: severity }), text("strong", count), text("span", severity)));
-  append(scanSummary, heading, list);
-  scanSummary.hidden = false;
+  append(
+    scanSummary,
+    text("h3", "Current scan"),
+    text("p", `${plural(state.report.findings.length, "finding")}. ${diagnostics === 0 ? "No parse diagnostics." : `${plural(diagnostics, "parse diagnostic")} below.`}`),
+    list,
+  );
 }
 
 function renderDiagnostics() {
@@ -248,14 +287,13 @@ function renderDiagnostics() {
     diagnosticsDisclosure.open = false;
     return;
   }
-  diagnosticsSummary.textContent = `${diagnostics.length} parse diagnostic${diagnostics.length === 1 ? "" : "s"}`;
+  diagnosticsSummary.textContent = plural(diagnostics.length, "parse diagnostic");
   for (const diagnostic of diagnostics) {
-    const location = `${diagnostic.file}:${diagnostic.line}`;
     append(
       diagnosticsList,
       append(
         node("li", { className: "diagnostic-item" }),
-        append(node("p", { className: "diagnostic-meta" }), text("code", diagnostic.code), text("code", location)),
+        append(node("p", { className: "diagnostic-meta" }), text("code", diagnostic.code), text("code", `${diagnostic.file}:${diagnostic.line}`)),
         text("p", diagnostic.message),
       ),
     );
@@ -289,8 +327,8 @@ function renderFixtures(fixtures) {
   for (const fixture of fixtures.filter((item) => item !== LOCAL_PROJECT)) {
     let control = fixtureList.querySelector(`[data-fixture="${fixture}"]`);
     if (!control) {
-      control = node("button", { className: "fixture-button", attrs: { type: "button", "data-fixture": fixture } });
-      append(control, text("strong", fixtureNames[fixture] || fixture), text("span", "", { className: "fixture-note" }), text("code", fixture));
+      control = node("button", { className: "source-option fixture-button", attrs: { type: "button", "data-fixture": fixture } });
+      append(control, node("span", { className: "option-marker", attrs: { "aria-hidden": "true" } }), append(node("span", { className: "option-body" }), text("strong", fixtureNames[fixture] || fixture), text("code", fixture)));
       fixtureList.append(control);
     }
     updateSourceButton(control, fixture);
@@ -304,18 +342,28 @@ function renderFixtures(fixtures) {
   }
 }
 
+function emphasize(control, primary) {
+  control.classList.toggle("primary-button", primary);
+  control.classList.toggle("quiet-button", !primary);
+}
+
 function renderControls() {
-  const enabled = engineReady && state.fixture !== null && !state.busy;
-  scanButton.disabled = !enabled;
-  scanButton.textContent = state.fixture === LOCAL_PROJECT ? "Scan current project" : state.fixture ? "Run example scan" : "Run selected scan";
-  resetButton.disabled = !enabled;
+  const selected = state.fixture !== null;
+  const scanned = Boolean(state.report);
+  scanButton.disabled = !engineReady || !selected;
+  scanButton.textContent = state.fixture === LOCAL_PROJECT ? "Scan current project" : selected ? "Run example scan" : "Scan selected source";
+  resetButton.disabled = !engineReady || !scanned;
   resetButton.textContent = state.fixture === LOCAL_PROJECT ? "Reset local copy" : "Reset isolated copy";
-  exportButton.disabled = !state.report || state.busy;
-  severityFilter.disabled = !state.report || state.busy;
-  ruleFilter.disabled = !state.report || state.busy;
-  clearFiltersButton.disabled = !state.report || state.busy;
-  folderButton.disabled = !engineReady || state.busy;
-  pasteButton.disabled = !engineReady || state.busy;
+  // One primary action per stage: the folder picker until a source is chosen, then that source's scan.
+  emphasize(folderButton, !selected);
+  emphasize(scanButton, selected && !scanned);
+  folderButton.textContent = "Choose project folder";
+  pasteButton.textContent = "Scan pasted mcp.json";
+  folderButton.disabled = !engineReady;
+  pasteButton.disabled = !engineReady;
+  exportButton.disabled = !scanned;
+  severityFilter.disabled = !scanned;
+  ruleFilter.disabled = !scanned;
 }
 
 function byRisk(findings) {
@@ -338,15 +386,13 @@ function filtersActive() {
 }
 
 function renderFilterSummary() {
-  if (!state.report) {
-    filterSummary.hidden = true;
-    clearFiltersButton.hidden = true;
-    return;
-  }
+  const total = state.report?.findings.length || 0;
+  filterPanel.hidden = total === 0;
+  if (total === 0) return;
   const visible = filteredFindings().length;
-  const total = state.report.findings.length;
-  filterSummary.hidden = false;
-  filterSummary.textContent = `${visible} of ${total} finding${total === 1 ? "" : "s"} shown.`;
+  filterSummary.textContent = visible === 0
+    ? "No findings match these filters. Clear filters to review all current findings."
+    : `${visible} of ${plural(total, "finding")} shown`;
   clearFiltersButton.hidden = !filtersActive();
 }
 
@@ -358,42 +404,34 @@ function renderRules() {
   ruleFilter.value = rules.includes(current) ? current : "all";
 }
 
-function showFindingState(message, kind = "") {
+function showFindingState(message) {
   findingState.hidden = false;
   findingState.textContent = message;
-  if (kind === "") delete findingState.dataset.kind;
-  else findingState.dataset.kind = kind;
 }
 
 function renderFindings() {
   const focused = focusedKey(findingList, "data-finding");
   findingList.replaceChildren();
   renderFilterSummary();
+  findingState.hidden = true;
+  const source = sourceDetails();
   if (!state.report) {
-    showFindingState("Choose a project folder or example, then run a scan.");
+    showFindingState(source ? `${source.name} is selected. Run the scan to list its findings.` : "Choose a project folder or example, then run a scan.");
     return;
   }
   if (state.report.findings.length === 0) {
     showFindingState("No rule matched these files. A clean scan is not proof that the project is secure.");
     return;
   }
-  const findings = filteredFindings();
-  if (findings.length === 0) {
-    showFindingState("No findings match the selected filters. Clear filters to review all current findings.");
-    return;
-  }
-  findingState.hidden = true;
-  delete findingState.dataset.kind;
-  for (const finding of findings) {
+  for (const finding of filteredFindings()) {
     const control = node("button", { className: "finding-button", attrs: { type: "button", "data-finding": finding.id, "aria-current": String(finding.id === state.selected) } });
-    const capability = finding.attackScenarioId ? "Safe replay available" : "Static evidence";
-    const meta = append(
-      node("span", { className: "finding-meta" }),
-      text("code", `${finding.file}:${finding.line}`),
-      text("span", capability),
+    append(
+      control,
+      append(node("span", { className: "finding-top" }), severityTag(finding), text("code", finding.ruleId)),
+      text("strong", finding.title),
+      append(node("span", { className: "finding-meta" }), text("code", `${finding.file}:${finding.line}`), text("span", finding.attackScenarioId ? "Replay available" : "Static evidence")),
     );
-    append(control, append(node("span", { className: "finding-top" }), severityTag(finding), text("code", finding.ruleId)), text("strong", finding.title), meta);
-    control.addEventListener("click", () => selectFinding(finding, control));
+    control.addEventListener("click", () => selectFinding(finding));
     append(findingList, append(node("li"), control));
   }
   restoreFocus(findingList, "data-finding", focused);
@@ -403,38 +441,48 @@ function resetFindingWorkflow() {
   state.replay = null;
   state.patch = null;
   state.verification = null;
-  setNotice(detailActionStatus, "");
+  state.actionError = null;
 }
 
-function selectFinding(finding, control) {
+function selectFinding(finding) {
+  if (state.busy) return;
   state.selected = finding.id;
   state.lastFinding = finding;
   resetFindingWorkflow();
-  for (const item of findingList.querySelectorAll(".finding-button")) item.setAttribute("aria-current", String(item === control));
+  for (const item of findingList.querySelectorAll(".finding-button")) item.setAttribute("aria-current", String(item.dataset.finding === finding.id));
   renderDetail();
-  reveal(caseFile);
+  // Bring the whole case file into view, then put focus on its title so the new detail is announced.
+  focusTarget($("#case-title"), { show: caseFile });
 }
 
-function diffEvidence(diff) {
+function diffBlock(patch) {
   const code = node("code");
-  for (const line of diff.split("\n")) {
-    const className = line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : line.startsWith("@") ? "header" : "";
-    append(code, text("span", line, { className }), document.createTextNode("\n"));
+  for (const line of patch.diff.split("\n")) {
+    const className = /^(?:\+\+\+|---|@@)/.test(line) ? "header" : line.startsWith("+") ? "added" : line.startsWith("-") ? "removed" : "";
+    append(code, text("span", line, { className }));
   }
-  return append(node("pre", { className: "evidence diff" }), code);
+  return codeBlock(`Proposed diff for ${patch.file}`, "evidence diff", code);
+}
+
+function facts(rows) {
+  return append(node("dl", { className: "facts" }), rows.filter(Boolean).map(([term, value]) => append(node("div"), text("dt", term), text("dd", value))));
+}
+
+function traceList(replay, label) {
+  return append(node("ol", { className: "trace", attrs: { "aria-label": label } }), replay.steps.map((step) => append(node("li"), text("strong", step.label), text("span", step.detail))));
 }
 
 function comparisonList(label, findings) {
   const list = node("ul");
   if (findings.length === 0) append(list, text("li", "None"));
   for (const finding of findings) append(list, text("li", `${finding.ruleId}: ${finding.title}`));
-  return append(node("div", { className: "comparison-group" }), text("h4", `${label} (${findings.length})`), list);
+  return append(node("div", { className: "comparison-group" }), text("h5", `${label} (${findings.length})`), list);
 }
 
 function comparisonView(comparison) {
   if (!comparison) return undefined;
   return append(
-    node("div", { className: "comparison", attrs: { "aria-label": "Findings compared with the first scan" } }),
+    node("div", { className: "comparison", attrs: { role: "group", "aria-label": "Findings compared with the first scan" } }),
     comparisonList("Resolved since first scan", comparison.resolved),
     comparisonList("Introduced since first scan", comparison.introduced),
   );
@@ -444,98 +492,146 @@ function passed(verification) {
   return verification?.status === "Simulation blocked" || verification?.status === "Verified";
 }
 
-function trail(finding, current) {
-  const { replay, patch, verification } = state;
-  const patchable = PATCHABLE_RULES.has(finding.ruleId);
-  const verified = passed(verification);
-  const stages = [
-    ["Scan", "done", current ? "current evidence" : "baseline evidence"],
-    ["Replay", replay ? `done ${replay.result}` : finding.attackScenarioId ? "" : "skip", replay ? replay.result : finding.attackScenarioId ? "not run" : "static evidence"],
-    ["Patch", patch ? "done" : patchable && current ? "" : "skip", patch ? (verification ? "applied to isolated copy" : "ready to review") : patchable && current ? "not generated" : "manual remediation"],
-    ["Verify", verification ? `done ${verified ? "pass" : "fail"}` : "", verification ? (verified ? "passed" : verification.status === "Regression detected" ? "regression" : "needs review") : "not run"],
-  ];
-  return append(node("ol", { className: "trail", attrs: { "aria-label": "Evidence trail" } }), stages.map(([label, status, note]) => append(node("li", { className: status }), text("strong", label), text("span", note))));
+function stage(key, index, name, tone, status, body) {
+  return append(
+    node("li", { className: "stage", attrs: { "data-tone": tone } }),
+    text("span", MARKS[tone] ?? index, { className: "stage-marker", attrs: { "aria-hidden": "true" } }),
+    append(
+      node("div", { className: "stage-content" }),
+      append(node("h4", { className: "stage-heading", id: `stage-${key}`, attrs: { tabindex: -1 } }), text("span", name), text("span", ": ", { className: "sr-only" }), text("span", status, { className: "stage-state" })),
+      body,
+      state.actionError?.stage === key ? text("p", state.actionError.message, { className: "notice", id: "stage-error", attrs: { tabindex: -1, "data-kind": "error" } }) : undefined,
+    ),
+  );
 }
 
-function actionAvailability(finding, current) {
-  if (!current) return "The finding above is baseline evidence. Its current verification appears below.";
-  if (!finding.attackScenarioId && !PATCHABLE_RULES.has(finding.ruleId)) {
-    return "Static evidence only. A safe replay is not available for this rule. No safe automatic patch is available for this finding. Apply the recommended boundary manually.";
+function actions(...controls) {
+  // After an unexpected Worker failure no action can succeed, so case actions wait for a reload.
+  for (const control of controls) if (control?.tagName === "BUTTON") control.disabled = !engineReady;
+  return append(node("div", { className: "stage-actions" }), controls);
+}
+
+// The recommended next step gets the only primary button: a proposed patch waits to be applied,
+// otherwise replay comes first when it exists, then the patch proposal.
+function nextStage(finding, current) {
+  if (!current) return "";
+  if (state.patch && !state.verification) return "patch";
+  if (finding.attackScenarioId && !state.replay) return "replay";
+  return PATCHABLE_RULES.has(finding.ruleId) && !state.verification ? "patch" : "";
+}
+
+function caseHeader(finding, current) {
+  return append(
+    node("header", { className: "case-head" }),
+    append(
+      node("p", { className: "case-meta" }),
+      severityTag(finding),
+      text("code", finding.ruleId),
+      text("code", `${finding.file}:${finding.line}`),
+      text("span", `Confidence: ${finding.confidence}`),
+      text("span", current ? "Current scan" : "Baseline scan", { className: "scan-state" }),
+    ),
+    text("h3", finding.title, { className: "case-title", id: "case-title", attrs: { tabindex: -1 } }),
+    text("p", finding.description, { className: "case-description" }),
+  );
+}
+
+function scanStage(finding, current) {
+  return stage("scan", 1, "Scan", "done", current ? "current evidence" : "baseline evidence", [
+    current ? undefined : note("This is baseline evidence. The current scan no longer reports this rule at this file and line."),
+    codeBlock(`Evidence at ${finding.file} line ${finding.line}`, "evidence", node("code", { text: finding.evidence })),
+    text("h5", "Recommended boundary"),
+    text("p", finding.remediation),
+  ]);
+}
+
+function replayStage(finding, current, next) {
+  const replay = state.replay;
+  if (!finding.attackScenarioId) return stage("replay", 2, "Replay", "skip", "unavailable", note("Static evidence only. A safe replay is not available for this rule."));
+  const tone = replay ? (replay.result === "blocked" ? "success" : "danger") : next === "replay" ? "active" : "pending";
+  return stage("replay", 2, "Replay", tone, replay ? replay.result : "not run", [
+    replay && state.verification ? note("This result is from before the patch. The replay after the patch appears under Verify.") : undefined,
+    replay
+      ? [text("h5", replay.scenarioName), facts([["Capability request", replay.capabilityRequest], ["Policy decision", replay.policyDecision], ["Result", replay.result]]), traceList(replay, "Replay steps"), text("p", replay.safetyNotice, { className: "boundary-note" })]
+      : note(current ? "Test whether this capability would be allowed in a bounded simulation. No project code or network request runs." : "The replay was not run before the patch."),
+    current ? actions(button(replay ? "Run safe replay again" : "Run safe replay", next === "replay" ? "primary-button" : "quiet-button", runReplay, { id: "replay-button" })) : undefined,
+  ]);
+}
+
+function patchStage(finding, current, next) {
+  const { patch, verification } = state;
+  if (!PATCHABLE_RULES.has(finding.ruleId)) {
+    return stage("patch", 3, "Patch", "skip", "manual remediation", note("No safe automatic patch is available for this finding. Apply the recommended boundary manually."));
   }
-  if (!PATCHABLE_RULES.has(finding.ruleId)) return "No safe automatic patch is available for this finding. Apply the recommended boundary manually.";
-  if (!finding.attackScenarioId) return "Static evidence only. A safe replay is not available for this rule.";
-  return "A safe replay is available. A patch can be proposed only through the allowlisted patcher.";
+  const tone = patch && verification ? "done" : next === "patch" ? "active" : patch ? "done" : "pending";
+  const status = patch ? (verification ? "applied to isolated copy" : "ready to review") : "not generated";
+  // Before the replay result is known, the patch action stays secondary so it does not compete with replay.
+  const proposeClass = next === "patch" && !verification ? "primary-button" : "quiet-button";
+  return stage("patch", 3, "Patch", tone, status, [
+    patch
+      ? [text("h5", "Proposed patch"), text("p", patch.reason), text("p", `Review note: ${patch.riskNote}`, { className: "stage-note" }), diffBlock(patch)]
+      : note(current ? "The allowlisted patcher proposes a minimal edit as a diff. Nothing changes until you apply it to the isolated copy." : "No patch was generated for this finding."),
+    current && patch && !verification
+      ? actions(button("Apply to isolated copy", "primary-button", applyPatch, { id: "apply-button" }), text("p", "Changes only the copy in this tab. Your repository is not modified."))
+      : undefined,
+    current && (!patch || verification) ? actions(button("Propose safe patch", proposeClass, generatePatch, { id: "patch-button" })) : undefined,
+  ]);
+}
+
+function verificationSummary(verification) {
+  if (verification.status === "Regression detected") return "The patched copy has more High or Critical findings than before. Review the introduced findings below.";
+  if (verification.targetFindingPresent) return "The target finding is still present in the isolated copy. Review the patch before you rely on it.";
+  if (verification.replay && verification.replay.result !== "blocked") return "The replay was not blocked after the patch. Review the patch before you rely on it.";
+  return verification.replay
+    ? "The target finding is gone from the isolated copy, and the replay is now blocked."
+    : "The target finding is gone from the isolated copy, and the High or Critical count did not rise.";
+}
+
+function verifyStage(finding) {
+  const verification = state.verification;
+  if (!verification) {
+    if (!PATCHABLE_RULES.has(finding.ruleId)) return stage("verify", 4, "Verify", "skip", "unavailable", note("Verification runs after an automatic patch. After you change the file yourself, load it again and rescan."));
+    return stage("verify", 4, "Verify", "pending", "not run", note(state.patch ? "Apply the patch to scan and replay the isolated copy again." : "After you apply a patch, the isolated copy is scanned and replayed again."));
+  }
+  const ok = passed(verification);
+  const { replay } = verification;
+  return stage("verify", 4, "Verify", ok ? "success" : "danger", ok ? "passed" : verification.status === "Regression detected" ? "regression" : "needs review", [
+    append(node("p", { className: `verification-status ${ok ? "success" : "review"}` }), text("span", ok ? "" : "!", { className: "status-glyph", attrs: { "aria-hidden": "true" } }), text("span", verification.status)),
+    text("p", verificationSummary(verification)),
+    facts([
+      ["Target finding after patch", verification.targetFindingPresent ? "Still present" : "Not present"],
+      ["High or Critical findings", `${verification.highCriticalBefore} before, ${verification.highCriticalAfter} after`],
+      replay && ["Replay after patch", replay.result],
+    ]),
+    // The replay steps after the patch repeat the shape of the replay stage, so they open on request.
+    replay
+      ? [append(node("details", { className: "trace-details" }), text("summary", "Show replay steps after the patch"), traceList(replay, "Replay steps after the patch")), text("p", replay.safetyNotice, { className: "boundary-note" })]
+      : undefined,
+    comparisonView(verification.comparison),
+  ]);
 }
 
 function renderDetail() {
   const selection = selectedFinding();
   detail.replaceChildren();
   detailState.hidden = Boolean(selection);
-  if (!selection) return;
-
+  backButton.hidden = !selection;
+  if (!selection) {
+    const clean = state.report?.findings.length === 0;
+    detailEmptyLead.textContent = clean ? "No finding to review." : "No finding selected yet.";
+    detailEmptyNote.textContent = clean ? "No rule matched these files." : "Scan a source, then choose a finding to follow it through each stage.";
+    return;
+  }
   const { finding, current } = selection;
-  const replay = state.replay;
-  const patch = state.patch;
-  const verification = state.verification;
-  const patchable = PATCHABLE_RULES.has(finding.ruleId);
-  const actions = [];
-  if (current && finding.attackScenarioId) actions.push(button("Run safe replay", "quiet-button", runReplay, { id: "replay-button" }));
-  if (current && patchable) actions.push(button("Propose safe patch", "primary-button", generatePatch, { id: "patch-button" }));
-
+  const next = nextStage(finding, current);
   append(
     detail,
-    section([
-      append(node("p", { className: "case-meta" }), severityTag(finding), text("code", finding.ruleId), text("span", `${finding.file}:${finding.line}`), text("span", `Confidence: ${finding.confidence}`), text("span", current ? "Current scan" : "Baseline scan")),
-      text("h3", finding.title, { className: "case-title" }),
-      text("p", finding.description),
-      trail(finding, current),
-      evidence(finding.evidence),
-    ]),
-    section([
-      text("h3", "Recommended boundary"),
-      text("p", finding.remediation),
-      text("p", actionAvailability(finding, current), { className: "action-availability" }),
-      actions.length > 0 ? append(node("div", { className: "detail-actions" }), actions) : undefined,
-    ]),
+    caseHeader(finding, current),
+    append(node("ol", { className: "trail", attrs: { "aria-label": "Evidence trail" } }), scanStage(finding, current), replayStage(finding, current, next), patchStage(finding, current, next), verifyStage(finding)),
   );
-
-  if (replay) {
-    const trace = node("ol", { className: "trace" });
-    replay.steps.forEach((step, index) => append(trace, append(node("li", index === replay.steps.length - 1 ? { className: replay.result } : {}), text("strong", step.label), text("span", step.detail))));
-    append(detail, section([text("h3", replay.scenarioName), text("p", `Capability request: ${replay.capabilityRequest}. Policy decision: ${replay.policyDecision}. Result: ${replay.result}.`, { className: "muted" }), trace, text("p", replay.safetyNotice, { className: "boundary-note" })]));
-  }
-
-  if (patch) {
-    append(detail, section([
-      text("h3", "Proposed patch"),
-      text("p", patch.reason),
-      text("p", `Review note: ${patch.riskNote}`, { className: "muted" }),
-      diffEvidence(patch.diff),
-      verification ? undefined : append(node("div", { className: "detail-actions" }), button("Apply to isolated copy", "primary-button", applyPatch, { id: "apply-button" })),
-    ]));
-  }
-
-  if (verification) {
-    append(detail, section([
-      text("span", verification.status, { className: `verification-status ${passed(verification) ? "success" : "review"}` }),
-      text("h3", "Verification report"),
-      text("p", `Target finding present after patch: ${verification.targetFindingPresent ? "Yes" : "No"}. High/Critical findings: ${verification.highCriticalBefore} before, ${verification.highCriticalAfter} after.`),
-      verification.replay ? text("p", `Replay result after patch: ${verification.replay.result}.`) : undefined,
-      comparisonView(verification.comparison),
-    ]));
-  }
 }
 
-async function chooseFixture(fixture) {
-  state.fixture = fixture;
-  state.report = null;
-  state.selected = null;
-  state.lastFinding = null;
-  resetFindingWorkflow();
-  setNotice(sourceActionStatus, "");
-  setNotice(reportActionStatus, "");
-  if (fixture !== LOCAL_PROJECT && localSummary.dataset.kind === "error") clearLocalNotice();
-  setStatus(`${fixtureNames[fixture] || fixture} selected. Run a scan when ready.`);
+function renderAll() {
   renderSourceContext();
   renderScanSummary();
   renderDiagnostics();
@@ -545,14 +641,32 @@ async function chooseFixture(fixture) {
   renderDetail();
 }
 
-async function runScan(reset = false) {
-  if (!state.fixture) return;
+function chooseFixture(fixture, message) {
+  if (state.busy) return;
+  state.fixture = fixture;
+  state.report = null;
+  state.selected = null;
+  state.lastFinding = null;
+  resetFindingWorkflow();
+  setNotice(sourceActionStatus, "");
+  setNotice(reportActionStatus, "");
+  if (fixture !== LOCAL_PROJECT) {
+    if (localSummary.dataset.kind === "error") localNote("");
+    pasteNote("");
+  }
+  setStatus(message || `${fixtureNames[fixture] || fixture} selected. ${fixture === LOCAL_PROJECT ? "Scan the current project" : "Run the example scan"} when ready.`);
+  renderAll();
+}
+
+async function runScan(reset, event) {
+  if (!state.fixture || state.busy) return;
+  const name = fixtureNames[state.fixture] || state.fixture;
   let scanned = false;
   setNotice(sourceActionStatus, "");
   setNotice(reportActionStatus, "");
-  setNotice(detailActionStatus, "");
   try {
-    setBusy(true, reset ? "Resetting the isolated copy and scanning it." : "Scanning the selected source.");
+    setBusy(true, reset ? "Resetting the isolated copy and scanning it again." : `Scanning ${name} in this tab.`, event?.currentTarget, reset ? "Resetting…" : "Scanning…");
+    if (!state.report) showFindingState(`Scanning ${name} in this tab.`);
     const value = await request(reset ? "/api/reset" : "/api/scan", { fixture: state.fixture });
     const count = value.report.findings.length;
     state.report = value.report;
@@ -561,115 +675,82 @@ async function runScan(reset = false) {
     state.lastFinding = first;
     resetFindingWorkflow();
     renderRules();
+    scanned = true;
+    const result = count === 0 ? "No rule matched these files." : `${plural(count, "finding")} ${count === 1 ? "is" : "are"} available.`;
+    setStatus(`${reset ? "Isolated copy reset." : "Scan complete."} ${result}`, "success");
+  } catch (error) {
+    const message = messageOf(error);
+    setStatus(message, "error");
+    setNotice(sourceActionStatus, `The scan did not complete. ${message}`, "error");
+  } finally {
+    setBusy(false);
+    renderAll();
+    if (scanned) focusTarget(evidenceHeading);
+  }
+}
+
+// Runs one case-file action, then moves focus to its new result, or to the error beside the control.
+async function caseAction(event, key, message, label, task) {
+  let target = `#stage-${key}`;
+  state.actionError = null;
+  try {
+    setBusy(true, message, event.currentTarget, label);
+    const [done, kind] = await task();
+    setStatus(done, kind);
+  } catch (error) {
+    const reason = messageOf(error);
+    state.actionError = { stage: key === "verify" ? "patch" : key, message: reason };
+    setStatus(reason, "error");
+    target = "#stage-error";
+  } finally {
+    setBusy(false);
     renderSourceContext();
     renderScanSummary();
     renderDiagnostics();
-    scanned = true;
-    const message = `Scan complete. ${count} evidence-based finding${count === 1 ? " is" : "s are"} available.`;
-    setStatus(message, "success");
-    setNotice(sourceActionStatus, `${message} Review the current findings below.`, "success");
-  } catch (error) {
-    const message = messageOf(error);
-    setStatus(message, "error");
-    setNotice(sourceActionStatus, message, "error");
-  } finally {
-    setBusy(false);
     renderFindings();
     renderDetail();
-    if (scanned) reveal(board);
+    focusTarget($(target));
   }
 }
 
-function revealLatest(done) {
-  if (done && detail.lastElementChild) reveal(detail.lastElementChild);
-}
-
-async function runReplay() {
+function runReplay(event) {
   const selection = selectedFinding();
-  if (!selection?.current || !selection.finding.attackScenarioId || !state.fixture) return;
-  let done = false;
-  setNotice(detailActionStatus, "");
-  try {
-    setBusy(true, "Replaying the bounded attack scenario.");
+  if (state.busy || !selection?.current || !selection.finding.attackScenarioId) return;
+  return caseAction(event, "replay", "Replaying the bounded attack scenario.", "Running replay…", async () => {
     const value = await request("/api/replay", { fixture: state.fixture, scenarioId: selection.finding.attackScenarioId });
     state.replay = value.replay;
-    done = true;
-    const kind = value.replay.result === "blocked" ? "success" : "error";
-    const message = `Replay complete: ${value.replay.result}.`;
-    setStatus(message, kind);
-    setNotice(detailActionStatus, message, kind);
-  } catch (error) {
-    const message = messageOf(error);
-    setStatus(message, "error");
-    setNotice(detailActionStatus, message, "error");
-  } finally {
-    setBusy(false);
-    renderDetail();
-    revealLatest(done);
-  }
+    return [`Replay complete: ${value.replay.result}.`, value.replay.result === "blocked" ? "success" : ""];
+  });
 }
 
-async function generatePatch() {
+function generatePatch(event) {
   const selection = selectedFinding();
-  if (!selection?.current || !PATCHABLE_RULES.has(selection.finding.ruleId) || !state.fixture) return;
-  let done = false;
-  setNotice(detailActionStatus, "");
-  try {
-    setBusy(true, "Generating a minimal allowlisted patch.");
+  if (state.busy || !selection?.current || !PATCHABLE_RULES.has(selection.finding.ruleId)) return;
+  return caseAction(event, "patch", "Generating a minimal allowlisted patch.", "Generating patch…", async () => {
     const value = await request("/api/patch/generate", { fixture: state.fixture, findingId: selection.finding.id });
     state.patch = value.patch;
     state.verification = null;
-    done = true;
-    const message = "Patch generated. Review the diff before applying it.";
-    setStatus(message, "success");
-    setNotice(detailActionStatus, message, "success");
-  } catch (error) {
-    const message = messageOf(error);
-    setStatus(message, "error");
-    setNotice(detailActionStatus, message, "error");
-  } finally {
-    setBusy(false);
-    renderDetail();
-    revealLatest(done);
-  }
+    return ["Patch generated. Review the diff before applying it.", "success"];
+  });
 }
 
-async function applyPatch() {
-  if (!state.patch || !state.fixture) return;
-  let done = false;
-  setNotice(detailActionStatus, "");
-  try {
-    setBusy(true, "Applying the patch to the isolated copy and verifying it.");
+function applyPatch(event) {
+  if (state.busy || !state.patch) return;
+  return caseAction(event, "verify", "Applying the patch to the isolated copy and verifying it.", "Applying and verifying…", async () => {
     const value = await request("/api/patch/apply", { fixture: state.fixture, patchId: state.patch.id });
     state.report = value.report;
+    // The replay stage keeps the result from before the patch; the verify stage shows the replay after it.
     state.verification = { ...value.verification, comparison: value.comparison };
-    state.replay = value.verification.replay || null;
     renderRules();
-    renderSourceContext();
-    renderScanSummary();
-    renderDiagnostics();
-    done = true;
-    const failed = value.verification.status === "Needs review" || value.verification.status === "Regression detected";
-    const message = `Verification complete: ${value.verification.status}.`;
-    setStatus(message, failed ? "error" : "success");
-    setNotice(detailActionStatus, message, failed ? "error" : "success");
-  } catch (error) {
-    const message = messageOf(error);
-    setStatus(message, "error");
-    setNotice(detailActionStatus, message, "error");
-  } finally {
-    setBusy(false);
-    renderFindings();
-    renderDetail();
-    revealLatest(done);
-  }
+    return [`Verification complete: ${value.verification.status}.`, passed(value.verification) ? "success" : "error"];
+  });
 }
 
 async function exportMarkdown() {
-  if (!state.report || !state.fixture) return;
+  if (state.busy || !state.report || !state.fixture) return;
   setNotice(reportActionStatus, "");
   try {
-    setBusy(true, "Building the before/after report.");
+    setBusy(true, "Building the before and after report.");
     const value = await request("/api/report", { fixture: state.fixture });
     const blob = new Blob([value.markdown], { type: "text/markdown" });
     const link = document.createElement("a");
@@ -684,39 +765,48 @@ async function exportMarkdown() {
   } catch (error) {
     const message = messageOf(error);
     setStatus(message, "error");
-    setNotice(reportActionStatus, message, "error");
+    setNotice(reportActionStatus, `The report was not exported. ${message}`, "error");
   } finally {
     setBusy(false);
   }
 }
 
-function localNote(message, kind = "") {
-  setNotice(localSummary, message, kind);
-}
-
-async function loadLocalProject(type, body, label) {
-  let loaded = false;
+// Loading a folder only reads and validates it. The visitor starts the scan, so nothing runs unannounced.
+// A pasted mcp.json is scanned at once because its button says so.
+async function loadLocalProject(type, body, label, control) {
+  if (state.busy) return;
+  const pasted = type === "loadFiles";
+  let value = null;
   setNotice(sourceActionStatus, "");
   setNotice(reportActionStatus, "");
-  setNotice(detailActionStatus, "");
+  pasteNote("");
   try {
-    setBusy(true, "Reading your .kiro files in this tab.");
-    const value = await send(type, body);
-    sources = value.fixtures;
-    localLabel = typeof label === "function" ? label(value) : label;
-    localNote(`${value.files} file${value.files === 1 ? "" : "s"} loaded from .kiro/. Load another folder to replace them. Reload the page to remove them.`);
-    if (type === "loadFiles") pasteInput.value = "";
-    loaded = true;
+    setBusy(true, "Reading supported .kiro files in this tab.", control, "Reading files…");
+    if (!pasted) localNote("Reading supported .kiro files in this tab.", "busy");
+    value = await send(type, body);
   } catch (error) {
     const message = messageOf(error);
     setStatus(message, "error");
-    localNote(message, "error");
+    if (pasted) pasteNote(`The pasted file was not loaded. ${message}`);
+    else localNote(`Files were not loaded. ${message}`, "error");
   } finally {
     setBusy(false);
   }
-  if (!loaded) return;
-  await chooseFixture(LOCAL_PROJECT);
-  await runScan(false);
+  if (!value) return;
+  sources = value.fixtures;
+  localLabel = typeof label === "function" ? label(value) : label;
+  const loaded = `${plural(value.files, "supported file")} loaded from .kiro/.`;
+  if (pasted) {
+    pasteInput.value = "";
+    localNote("Pasted mcp.json accepted. It stays in this tab. Paste again to replace it.", "success");
+    chooseFixture(LOCAL_PROJECT);
+    await runScan(false);
+    return;
+  }
+  const skipped = value.tooLarge === 0 ? "" : ` ${plural(value.tooLarge, "file")} over 1 MiB skipped.`;
+  localNote(`${loaded}${skipped} Files stay in this tab. Choose another folder to replace them.`, "success");
+  chooseFixture(LOCAL_PROJECT, `${loaded} Scan the current project when ready.`);
+  scanButton.focus();
 }
 
 async function loadChosenFolder() {
@@ -724,27 +814,28 @@ async function loadChosenFolder() {
   folderInput.value = "";
   if (entries.length === 0) return;
   await loadLocalProject("loadFolder", { entries }, (value) => {
-    const skipped = value.tooLarge === 0 ? "" : `, ${value.tooLarge} skipped because it is larger than 1 MiB`;
-    return `${value.files} .kiro file${value.files === 1 ? "" : "s"}${skipped}`;
-  });
+    const skipped = value.tooLarge === 0 ? "" : `, ${value.tooLarge} skipped over 1 MiB`;
+    return `${plural(value.files, ".kiro file")}${skipped}`;
+  }, folderButton);
 }
 
 async function loadPastedConfig() {
-  const content = pasteInput.value;
-  if (content.trim() === "") {
+  if (state.busy) return;
+  if (pasteInput.value.trim() === "") {
     const message = "Paste the contents of an mcp.json file first.";
     setStatus(message, "error");
-    localNote(message, "error");
+    pasteNote(message);
     pasteInput.focus();
     return;
   }
-  await loadLocalProject("loadFiles", { files: [{ path: ".kiro/settings/mcp.json", content }] }, "Pasted mcp.json");
+  await loadLocalProject("loadFiles", { files: [{ path: ".kiro/settings/mcp.json", content: pasteInput.value }] }, "Pasted mcp.json", pasteButton);
 }
 
 function clearFilters() {
   severityFilter.value = "all";
   ruleFilter.value = "all";
   renderFindings();
+  severityFilter.focus();
 }
 
 function setTheme(theme) {
@@ -752,7 +843,7 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $(".theme-label").textContent = next === "light" ? "Light theme" : "Dark theme";
   $("#theme-toggle").setAttribute("aria-label", `Switch to ${next} theme`);
-  themeColor?.setAttribute("content", theme === "dark" ? "#10100f" : "#e3d8cf");
+  themeColor?.setAttribute("content", theme === "dark" ? "#10100f" : "#f8f1eb");
   try {
     localStorage.setItem("gravescan-theme", theme);
   } catch {
@@ -763,20 +854,37 @@ function setTheme(theme) {
 $("#theme-toggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
 fixtureList.addEventListener("click", (event) => {
   const control = event.target.closest("[data-fixture]");
-  if (control && !control.disabled) chooseFixture(control.dataset.fixture);
+  if (control && !control.disabled && control.dataset.fixture !== state.fixture) chooseFixture(control.dataset.fixture);
 });
 localProjectButton.addEventListener("click", () => {
-  if (!localProjectButton.disabled) chooseFixture(LOCAL_PROJECT);
+  if (!localProjectButton.disabled && state.fixture !== LOCAL_PROJECT) chooseFixture(LOCAL_PROJECT);
 });
-scanButton.addEventListener("click", () => runScan(false));
-resetButton.addEventListener("click", () => runScan(true));
+scanButton.addEventListener("click", (event) => runScan(false, event));
+resetButton.addEventListener("click", (event) => runScan(true, event));
 exportButton.addEventListener("click", exportMarkdown);
 clearFiltersButton.addEventListener("click", clearFilters);
-folderButton.addEventListener("click", () => folderInput.click());
+folderButton.addEventListener("click", () => {
+  if (!state.busy) folderInput.click();
+});
 folderInput.addEventListener("change", loadChosenFolder);
 pasteButton.addEventListener("click", loadPastedConfig);
 severityFilter.addEventListener("change", renderFindings);
 ruleFilter.addEventListener("change", renderFindings);
+backButton.addEventListener("click", () => focusTarget(findingList.querySelector('[aria-current="true"]') || findingList.querySelector("button") || evidenceHeading, { nearest: true }));
+// A control that receives focus under the sticky header scrolls just enough to show it.
+document.addEventListener("focusin", (event) => {
+  const target = event.target;
+  if (!guidedFocus && !topbar.contains(target) && target.getBoundingClientRect().top < headerOffset()) target.scrollIntoView({ block: "nearest" });
+});
+// Escape closes an open disclosure and returns focus to its summary. Typed text stays in the field.
+document.addEventListener("keydown", (event) => {
+  const open = event.key === "Escape" && !event.isComposing ? event.target.closest?.("details[open]") : null;
+  if (!open) return;
+  open.open = false;
+  open.querySelector("summary").focus();
+});
+new window.ResizeObserver(measureHeader).observe(topbar);
+window.addEventListener("resize", measureHeader);
 
 try {
   setTheme(localStorage.getItem("gravescan-theme") || "dark");
@@ -785,20 +893,12 @@ try {
 }
 
 renderSourceContext();
-renderScanSummary();
-renderDiagnostics();
-renderFilterSummary();
 fixturesRequest
   .then((bundle) => send("init", { bundle }))
   .then((value) => {
     engineReady = true;
     sources = value.fixtures;
-    renderSourceContext();
-    renderScanSummary();
-    renderDiagnostics();
-    renderFixtures(sources);
-    renderControls();
-    renderFindings();
+    renderAll();
     setStatus("Choose a project folder or controlled example to begin.");
   })
   .catch(() => {
