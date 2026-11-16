@@ -288,7 +288,7 @@ function renderDetail() {
   if (state.error) append(detail.lastElementChild, text("p", state.error, { className: "inline-error" }));
 }
 async function chooseFixture(fixture) {
-  state.fixture = fixture; state.report = null; state.selected = null; state.lastFinding = null; state.replay = null; state.patch = null; state.verification = null;
+  state.fixture = fixture; state.report = null; state.selected = null; state.lastFinding = null; state.replay = null; state.patch = null; state.verification = null; state.error = null;
   setStatus(`${fixtureNames[fixture]} selected. Run a scan when ready.`); renderSourceContext(); renderScanSummary(); renderFixtures(sources); renderControls(); renderFindings(); renderDetail();
 }
 async function runScan(reset = false) {
@@ -384,7 +384,7 @@ function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   $(".theme-label").textContent = next === "light" ? "Light theme" : "Dark theme";
   $("#theme-toggle").setAttribute("aria-label", `Switch to ${next} theme`);
-  themeColor?.setAttribute("content", theme === "dark" ? "#0d0c13" : "#f3f1ec");
+  themeColor?.setAttribute("content", theme === "dark" ? "#151513" : "#e3d8cf");
   try { localStorage.setItem("gravescan-theme", theme); } catch {
     // Storage can be blocked (private mode); the theme still applies to this page.
   }
