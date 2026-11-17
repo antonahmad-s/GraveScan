@@ -4,6 +4,8 @@
 
 **Hackathon category:** Frankenstein (Kiroween)
 
+**Live app:** <https://gravescan.antonahmadsusilo.workers.dev/>. No login, and everything runs in your browser tab.
+
 ## What it does
 
 1. Pick a controlled fixture repository, or choose your own project folder or paste an `mcp.json`.
