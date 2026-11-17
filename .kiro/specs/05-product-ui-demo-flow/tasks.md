@@ -11,5 +11,5 @@
 - [x] 9. Build the before/after Markdown report in `@gravescan/reporting`, serve it from `/api/report`, and show resolved and introduced findings in the verification panel.
 - [x] 10. Add Playwright e2e in `tests/e2e` (`pnpm test:e2e`) covering the demo flow, filters, themes, keyboard focus, four viewport widths, and visitor isolation. Runs in CI.
 - [x] 11. Add `Dockerfile`, `docker-compose.yml`, `/healthz`, and `HOST`/`PORT` configuration for deployment. The production install and server start were verified without a container runtime; the image itself has not been built here.
-- [ ] 12. Deploy to a public URL and record it in the Devpost form. Requires the owner's Cloudflare account.
+- [x] 12. Deploy to a public URL and record it in the Devpost form. Deployed through Workers Builds at https://gravescan.antonahmadsusilo.workers.dev/; the URL is in `README.md` and the page's canonical link. The owner enters it in the Devpost form.
 - [x] 13. Move to a static site on Cloudflare Workers: browser entries for fixtures, scanner, and patcher; an in-browser engine; `pnpm build` with esbuild; `_headers`; `wrangler.jsonc`. This replaces the Node server, session cookies, and Docker files from tasks 1, 8, and 11. Covered by engine unit tests, static-server tests, a Wrangler dry run, and Playwright e2e against the built site.
